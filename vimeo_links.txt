@@ -1,0 +1,13 @@
+# Danh sách Vimeo embed links
+# 1 URL mỗi dòng
+# Lines bắt đầu bằng # sẽ bị ignore
+
+https://player.vimeo.com/video/708055782
+https://player.vimeo.com/video/708055907
+https://player.vimeo.com/video/708055881
+https://player.vimeo.com/video/708055865
+https://player.vimeo.com/video/708055833
+https://player.vimeo.com/video/708055808
+
+
+# Có thể thêm comments

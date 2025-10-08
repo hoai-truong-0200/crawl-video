@@ -1,0 +1,8 @@
+- mở site
+- click đăng nhập
+- lấy list id khóa học lưu vào file
+- truy cập vào khóa học bất kỳ lấy player config
+- lấy id tất cả video trong khóa học
+- check config nếu còn hạn thì download hết hạn thì lấy lại config
+- lấy tiêu đề khóa học và tieu đề video
+- lưu file video với tên tiêu đề video và phân loại thư mục khóa học

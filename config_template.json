@@ -1,0 +1,31 @@
+{
+  "_comment": "Paste window.playerConfig vào đây",
+  "_instruction": "1. Mở browser: https://player.vimeo.com/video/YOUR_VIDEO_ID",
+  "_instruction2": "2. F12 → Console → copy(JSON.stringify(window.playerConfig, null, 2))",
+  "_instruction3": "3. Paste kết quả vào file này (xóa các dòng _ này)",
+
+  "request": {
+    "files": {
+      "hls": {
+        "cdns": {
+          "akfire_interconnect_quic": {
+            "url": "PASTE_HLS_URL_HERE"
+          }
+        }
+      },
+      "progressive": [
+        {
+          "quality": "1080p",
+          "url": "PASTE_PROGRESSIVE_URL_HERE"
+        }
+      ]
+    }
+  },
+  "video": {
+    "id": 0,
+    "title": "Video Title",
+    "duration": 0,
+    "width": 1920,
+    "height": 1080
+  }
+}
