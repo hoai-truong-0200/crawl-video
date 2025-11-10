@@ -1,0 +1,57 @@
+
+{
+    "categories": [
+        {
+            "name" : "Critical Thinking and Communication",
+            "url": "https://unlimited.globis.co.jp/en/categories/critical-thinking-communication"
+        },
+        {
+            "name" : "Marketing",
+            "url": "https://unlimited.globis.co.jp/en/categories/marketing"
+        },
+        {
+            "name" : "Strategy",
+            "url": "https://unlimited.globis.co.jp/en/categories/strategy"
+        },
+        {
+            "name" : "Accounting and Finance",
+            "url": "https://unlimited.globis.co.jp/en/categories/accounting-finance"
+        },
+        {
+            "name" : "Leadership",
+            "url": "https://unlimited.globis.co.jp/en/categories/leadership"
+        },
+        {
+            "name" : "Organizational Behavior",
+            "url": "https://unlimited.globis.co.jp/en/categories/organizational-behavior"
+        },
+        {
+            "name" : "Analytical Skills",
+            "url": "https://unlimited.globis.co.jp/en/categories/analytical-skills"
+        },
+        {
+            "name" : "Technovate (Technology and Innovation)",
+            "url": "https://unlimited.globis.co.jp/en/categories/technovate"
+        },
+        {
+            "name" : "Entrepreneurship",
+            "url": "https://unlimited.globis.co.jp/en/categories/entrepreneurship"
+        },
+        {
+            "name" : "Software Skills",
+            "url": "https://unlimited.globis.co.jp/en/categories/software-skills"
+        },
+        {
+            "name" : "Global",
+            "url": "https://unlimited.globis.co.jp/en/categories/global"
+        },
+        {
+            "name" : "Kokorozashi and Career",
+            "url": "https://unlimited.globis.co.jp/en/categories/kokorozashi-career"
+        },
+        {
+            "name" : "Japan/Asia",
+            "url": "https://unlimited.globis.co.jp/en/categories/japan-asia"
+        }
+    ]
+}
