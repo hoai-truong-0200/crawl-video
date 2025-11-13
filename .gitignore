@@ -6,15 +6,32 @@ __pycache__/
 .Python
 venv/
 env/
+.venv/
 *.egg-info/
+dist/
+build/
 
 # Project specific
 data/downloads/*
-data/logs/*
+!data/downloads/.gitkeep
+logs/*
+!logs/.gitkeep
 data/sessions/*
+!data/sessions/.gitkeep
 data/cache/*
+!data/cache/.gitkeep
 .env
 *.log
+
+# Google Drive credentials
+config/credentials.json
+config/token.json
+
+# Temporary files
+*.tmp
+*.temp
+page.html
+result.json
 
 # IDE
 .vscode/
@@ -25,3 +42,7 @@ data/cache/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Playwright
+playwright-state/
+cookies.txt

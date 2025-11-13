@@ -1,3 +1,67 @@
-1. Truy cập vào các link website được liệt kê trong file data/courses/sites.txt.
-    - Link 1: lấy danh sách category
-2. Thu thập thông tin các khóa học có trên các trang web này.
+# ============================================
+# CRAWL VIDEO - Python Dependencies
+# ============================================
+# Python 3.10+ required
+
+# ============================================
+# Browser Automation & Anti-Detection
+# ============================================
+playwright>=1.40.0
+playwright-stealth>=1.0.0
+
+# Alternative anti-detection (optional)
+# undetected-playwright>=0.3.0
+
+# ============================================
+# Video Download
+# ============================================
+yt-dlp>=2024.10.0
+
+# ============================================
+# Google Drive API
+# ============================================
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
+google-api-python-client>=2.100.0
+
+# ============================================
+# HTTP Client
+# ============================================
+httpx[http2]>=0.25.0
+aiofiles>=23.0.0
+
+# ============================================
+# Human Behavior Simulation
+# ============================================
+faker>=20.0.0
+numpy>=1.24.0
+
+# ============================================
+# Configuration & Settings
+# ============================================
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+
+# ============================================
+# Logging & Progress
+# ============================================
+loguru>=0.7.0
+tqdm>=4.66.0
+
+# ============================================
+# Retry Logic & Error Handling
+# ============================================
+tenacity>=8.2.0
+
+# ============================================
+# Data Parsing
+# ============================================
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# ============================================
+# Utilities
+# ============================================
+python-dateutil>=2.8.0

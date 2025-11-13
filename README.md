@@ -1,50 +1,208 @@
-# 🎥 Vimeo Enterprise Crawler
+# 🎥 GLOBIS Video Crawler & Uploader
 
-## Project Status
-🚧 Under Development - Day 1 Complete!
+Automated system to crawl video courses from GLOBIS Unlimited, download videos, and upload to Google Drive.
 
-## Features (Planned)
-- ✅ Advanced anti-detection
-- ✅ Browser fingerprinting protection
-- ✅ Vimeo-specific extraction
-- ✅ Concurrent downloads
-- ✅ Session management
+## 🚀 Features
 
-## Installation
+- ✅ **Advanced Anti-Detection**: Stealth browser automation with human behavior simulation
+- ✅ **Smart Crawling**: Extract courses and videos metadata from multiple categories
+- ✅ **Video Download**: Automated download using yt-dlp with Vimeo support
+- ✅ **Cloud Upload**: Automatic upload to Google Drive with resumable transfers
+- ✅ **Session Management**: Resume operations from interruptions
+- ✅ **Rate Limiting**: Avoid detection with intelligent request throttling
+
+## 📁 Project Structure
+
+```
+crawl-video/
+├── src/
+│   ├── browser/          # Anti-detection browser setup
+│   ├── crawler/          # Course & video metadata crawling
+│   ├── downloader/       # Video download with yt-dlp
+│   ├── uploader/         # Google Drive integration
+│   └── utils/            # Session, logging, helpers
+├── config/               # Configuration files
+├── data/
+│   ├── courses/          # Course metadata JSON files
+│   ├── downloads/        # Downloaded videos
+│   ├── sessions/         # Session state files
+│   └── cache/            # Temporary cache
+├── docs/                 # Documentation
+├── logs/                 # Application logs
+├── tests/                # Unit tests
+└── main.py              # Main entry point
+```
+
+## 🛠️ Tech Stack
+
+- **Browser Automation**: Playwright + playwright-stealth
+- **Video Download**: yt-dlp + ffmpeg
+- **Cloud Storage**: Google Drive API v3
+- **HTTP Client**: httpx with HTTP/2
+- **Logging**: loguru
+- **Configuration**: pydantic + python-dotenv
+
+## 📦 Installation
+
+### Prerequisites
+
+- Python 3.10+
+- ffmpeg and ffprobe
+- Google Cloud account with Drive API enabled
+
+### Setup
+
+1. **Clone repository**:
 ```bash
-# Clone repository
-git clone [repo-url]
-cd vimeo-enterprise-crawler
+git clone <repo-url>
+cd crawl-video
+```
 
-# Setup virtual environment
+2. **Create virtual environment**:
+```bash
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-# Install dependencies
+3. **Install dependencies**:
+```bash
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-# Quick Start
+4. **Install system dependencies**:
 ```bash
-# Coming soon...
-python main.py -u https://vimeo.com/123456
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# macOS
+brew install ffmpeg
+
+# Windows
+# Download from https://ffmpeg.org/download.html
 ```
 
-# Development Progress
-- [x] Day 1: Environment setup ✅
-- [ ] Day 2: Project structure
-- [ ] Day 3: Browser controller
-- [ ] Day 4: Behavior simulation
-- [ ] Day 5: Advanced fingerprinting
-- [ ] Day 6: Session management
-- [ ] Day 7: Vimeo extraction
-- [ ] Day 8: Downloader
-- [ ] Day 9: CLI interface
-- [ ] Day 10: Testing
-- [ ] Day 11: Optimization
-- [ ] Day 12: Documentation
+5. **Configure environment**:
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
 
-# License
-MIT
-EOF
+6. **Setup Google Drive API**:
+   - Create a Google Cloud project
+   - Enable Google Drive API
+   - Create Service Account or OAuth2 credentials
+   - Download credentials to `config/credentials.json`
+
+## 🎯 Usage
+
+### Basic Usage
+
+```bash
+# Run full workflow: crawl -> download -> upload
+python main.py
+
+# Crawl metadata only
+python main.py --crawl-only
+
+# Download videos only
+python main.py --download-only
+
+# Upload to Drive only
+python main.py --upload-only
+```
+
+### Advanced Options
+
+```bash
+# Resume from last session
+python main.py --resume
+
+# Specify custom config
+python main.py --config custom_config.json
+
+# Enable debug logging
+python main.py --log-level DEBUG
+
+# Process specific category
+python main.py --category "Marketing"
+```
+
+## ⚙️ Configuration
+
+Edit `.env` file for configuration:
+
+```env
+# Browser Settings
+BROWSER_HEADLESS=false
+BROWSER_TIMEOUT=45000
+
+# Google Drive
+GOOGLE_CREDENTIALS_PATH=config/credentials.json
+
+# Download Settings
+DOWNLOAD_PATH=data/downloads
+VIDEO_QUALITY_PREFERENCE=720p,1080p,480p
+
+# Anti-Detection
+STEALTH_MODE=true
+BEHAVIOR_SIMULATION=true
+MAX_REQUESTS_PER_MINUTE=10
+```
+
+See [.env.example](.env.example) for all available options.
+
+## 📖 Documentation
+
+- [Tech Research](docs/TECH_RESEARCH.md) - Technology selection and analysis
+- [TODO List](TODO.md) - Development roadmap and progress
+
+## 🔒 Security & Privacy
+
+- Never commit `.env` file or credentials
+- Store Google credentials securely in `config/credentials.json`
+- Use anti-detection responsibly and ethically
+- Respect website terms of service and rate limits
+
+## 🐛 Troubleshooting
+
+### Browser Detection Issues
+- Ensure `STEALTH_MODE=true` in `.env`
+- Try using headed mode: `BROWSER_HEADLESS=false`
+- Clear browser cache in `data/cache/`
+
+### Download Failures
+- Check ffmpeg installation: `ffmpeg -version`
+- Verify video URL is accessible
+- Check logs in `logs/` directory
+
+### Upload Errors
+- Verify Google credentials are valid
+- Check Drive API is enabled
+- Ensure sufficient Drive storage
+
+## 📝 Development
+
+### Project Status
+
+See [TODO.md](TODO.md) for current development status.
+
+**Progress**: 2/25 tasks (8%)
+
+### Running Tests
+
+```bash
+pytest tests/
+```
+
+## 📄 License
+
+MIT License
+
+## ⚠️ Disclaimer
+
+This tool is for educational purposes only. Ensure you have proper authorization before crawling any website. Respect robots.txt and website terms of service.
+
+---
+
+**Last Updated**: 2025-11-13
