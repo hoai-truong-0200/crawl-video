@@ -5,10 +5,14 @@ Demonstrates how to use the browser automation with anti-detection.
 """
 
 import asyncio
+import sys
 from pathlib import Path
 from loguru import logger
 
-from browser_manager import BrowserManager
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from src.browser.browser_manager import BrowserManager
 
 
 async def example_basic_navigation():
@@ -44,52 +48,119 @@ async def example_basic_navigation():
 
 
 async def example_with_manual_login():
-    """Example: Manual login with session saving"""
+    """Example: Manual login with session saving - GLOBIS"""
 
-    session_file = Path("data/sessions/globis_session.json")
+    session_file = Path("../../data/sessions/globis_session.json")
+    session_file.parent.mkdir(parents=True, exist_ok=True)
+
+    print("\n" + "="*60)
+    print("🔐 GLOBIS Smart Login Test")
+    print("="*60)
 
     browser = BrowserManager(
         headless=False,  # Must be False for manual login
-        user_data_dir=Path("data/cache/browser_profile"),
-        fingerprint_seed="my-unique-id",  # Consistent fingerprint
+        fingerprint_seed="globis-test-session",
+        randomness_factor=1.0,
+        session_file=session_file  # Auto-load if exists
     )
 
     try:
         page = await browser.start()
+        print("✅ Browser started\n")
 
-        # Wait for manual login
-        success = await browser.wait_for_manual_login(
-            login_url="https://unlimited.globis.co.jp/en/login",
-            success_indicator="div.user-menu",  # Adjust to actual selector
-            timeout=300000  # 5 minutes
+        # Check if session is valid by navigating to protected page
+        test_url = "https://unlimited.globis.co.jp/ja"
+        is_valid = await browser.check_session_valid(
+            test_url=test_url,
+            login_indicator="signin",
+            success_indicator="a[href*='signout'], div.user-menu, .user-name"
         )
 
-        if success:
-            # Save session for future use
-            await browser.save_session(session_file)
+        if is_valid:
+            print("\n" + "="*60)
+            print("✅ EXISTING SESSION IS VALID!")
+            print("="*60)
+            print("No manual login needed\n")
 
-            # Continue with authenticated actions
-            await browser.navigate_to("https://unlimited.globis.co.jp/en/dashboard")
-            await browser.read_page()
+        else:
+            print("\n" + "="*60)
+            print("⚠️  SESSION EXPIRED OR NOT FOUND")
+            print("="*60)
+            print("\nBrowser window will open...")
+            print("Please login manually when redirected to login page")
+            print("="*60 + "\n")
+
+            # Navigate to GLOBIS login page
+            login_url = "https://unlimited.globis.co.jp/signin?locale=en"
+            print(f"🔗 Navigating to: {login_url}\n")
+
+            await browser.navigate_to(login_url)
+
+            print("="*60)
+            print("👤 PLEASE LOGIN IN THE BROWSER WINDOW")
+            print("="*60)
+            print("\nWaiting for login (timeout: 10 minutes)...")
+            print("After login, page will redirect to /ja")
+            print("="*60 + "\n")
+
+            # Wait for manual login with multiple possible success indicators
+            # After successful login, GLOBIS redirects to /ja
+            success = await browser.wait_for_manual_login(
+                success_indicator="a[href*='signout'], div.user-menu, .user-name",
+                timeout=600000  # 10 minutes
+            )
+
+            if success:
+                print("\n✅ Login successful!")
+
+                # Save session for future use
+                print(f"💾 Saving session to: {session_file}")
+                await browser.save_session(session_file)
+                print("✅ Session saved!\n")
+
+            else:
+                print("\n❌ Login timeout or failed\n")
+                return
+
+        # Test post-login navigation
+        print("🧪 Testing post-login navigation...")
+        await browser.navigate_to("https://unlimited.globis.co.jp/en/categories/critical-thinking-communication")
+
+        title = await page.title()
+        print(f"📄 Page: {title}\n")
+
+        # Simulate reading
+        await browser.read_page(min_duration=2, max_duration=3)
+
+        print("="*60)
+        print("✅ TEST COMPLETED!")
+        print("="*60)
+        print(f"\nSession saved to: {session_file}")
+        print("Next time you run this, it will auto-login!")
+        print("\nBrowser will close in 10 seconds...")
+        print("="*60 + "\n")
+
+        await asyncio.sleep(10)
 
     finally:
         await browser.close()
+        print("\n✅ Browser closed\n")
 
 
 async def example_load_existing_session():
     """Example: Load saved session and continue"""
 
-    session_file = Path("data/sessions/globis_session.json")
+    session_file = Path("../../data/sessions/globis_session.json")
 
-    browser = BrowserManager(headless=True)
+    browser = BrowserManager(
+        headless=True,
+        session_file=session_file  # Auto-loads session
+    )
 
     try:
         page = await browser.start()
 
-        # Load saved session
-        await browser.load_session(session_file)
-
-        # Navigate (already authenticated)
+        # Session already loaded, navigate directly (already authenticated)
         await browser.navigate_to("https://unlimited.globis.co.jp/en/dashboard")
 
         # Your crawling logic here...
@@ -145,19 +216,12 @@ async def example_advanced_interaction():
 if __name__ == "__main__":
     # Configure logging
     logger.add(
-        "logs/browser_example.log",
+        "../../logs/browser_example.log",
         rotation="1 MB",
         level="DEBUG"
     )
 
-    # Run example
-    logger.info("Starting browser automation example...")
-
-    # Choose which example to run:
-    # asyncio.run(example_basic_navigation())
-    # asyncio.run(example_with_manual_login())
-    # asyncio.run(example_load_existing_session())
-    # asyncio.run(example_context_manager())
-    asyncio.run(example_advanced_interaction())
-
-    logger.info("Example completed!")
+    # Run manual login example
+    print("\n🚀 Starting GLOBIS Manual Login Test...")
+    asyncio.run(example_with_manual_login())
+    print("✅ Test completed!\n")

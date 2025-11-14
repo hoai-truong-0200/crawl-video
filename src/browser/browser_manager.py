@@ -30,7 +30,8 @@ class BrowserManager:
         headless: bool = False,
         user_data_dir: Optional[Path] = None,
         fingerprint_seed: Optional[str] = None,
-        randomness_factor: float = 1.0
+        randomness_factor: float = 1.0,
+        session_file: Optional[Path] = None
     ):
         """
         Initialize browser manager
@@ -40,10 +41,12 @@ class BrowserManager:
             user_data_dir: Directory for persistent browser data
             fingerprint_seed: Seed for consistent fingerprint
             randomness_factor: How random behavior should be (0.5-2.0)
+            session_file: Path to session file for auto-loading
         """
         self.headless = headless
         self.user_data_dir = user_data_dir
         self.randomness_factor = randomness_factor
+        self.session_file = session_file
 
         # Generate fingerprint
         self.fingerprint_gen = FingerprintGenerator()
@@ -68,6 +71,7 @@ class BrowserManager:
     async def start(self) -> Page:
         """
         Start browser and create page with anti-detection
+        Auto-loads session if session_file exists
 
         Returns:
             Playwright Page instance
@@ -103,6 +107,11 @@ class BrowserManager:
             "timezone_id": self.fingerprint.timezone,
         })
 
+        # Load session if exists
+        if self.session_file and self.session_file.exists():
+            logger.info(f"📂 Loading session from {self.session_file}")
+            context_options["storage_state"] = str(self.session_file)
+
         self.context = await self.browser.new_context(**context_options)
         logger.info("✅ Browser context created")
 
@@ -128,7 +137,10 @@ class BrowserManager:
             self.randomness_factor
         )
 
-        logger.info("✅ Page created with full anti-detection")
+        if self.session_file and self.session_file.exists():
+            logger.info("✅ Page created with session restored")
+        else:
+            logger.info("✅ Page created with full anti-detection")
 
         return self.page
 
@@ -219,16 +231,17 @@ class BrowserManager:
 
     async def wait_for_manual_login(
         self,
-        login_url: str,
         success_indicator: str,
+        login_url_pattern: str = "signin",
         timeout: int = 300000  # 5 minutes
     ) -> bool:
         """
         Wait for user to manually login in headed mode
+        NOTE: Caller should navigate to login page before calling this
 
         Args:
-            login_url: URL of login page
             success_indicator: Selector that appears after successful login
+            login_url_pattern: Pattern in URL that indicates still on login page
             timeout: Maximum wait time in milliseconds
 
         Returns:
@@ -242,22 +255,100 @@ class BrowserManager:
             return False
 
         logger.info("🔐 Waiting for manual login...")
-        logger.info(f"Please login at: {login_url}")
 
-        # Navigate to login page
-        await self.navigate_to(login_url)
+        start_time = asyncio.get_event_loop().time()
 
         try:
-            # Wait for success indicator
-            await self.page.wait_for_selector(
-                success_indicator,
-                timeout=timeout
-            )
-            logger.info("✅ Login successful!")
-            return True
+            while True:
+                # Check if timed out
+                if (asyncio.get_event_loop().time() - start_time) * 1000 > timeout:
+                    raise TimeoutError("Login timeout exceeded")
+
+                # Wait a bit
+                await asyncio.sleep(2)
+
+                # Check if URL changed (no longer on login page)
+                current_url = self.page.url
+                if login_url_pattern not in current_url.lower():
+                    logger.info(f"✅ URL changed from login page: {current_url}")
+
+                    # Wait for page to stabilize
+                    await asyncio.sleep(3)
+
+                    # Try to find success indicator
+                    try:
+                        await self.page.wait_for_selector(
+                            success_indicator,
+                            timeout=10000,
+                            state="attached"
+                        )
+                        logger.info("✅ Login successful (success indicator found)!")
+                        return True
+                    except:
+                        # Even if indicator not found, if URL changed, consider it success
+                        logger.info("✅ Login successful (URL changed from login page)!")
+                        return True
 
         except Exception as e:
             logger.error(f"❌ Login timeout or failed: {e}")
+            return False
+
+    async def check_session_valid(
+        self,
+        test_url: str,
+        login_indicator: str = "signin",
+        success_indicator: Optional[str] = None,
+        timeout: int = 15000
+    ) -> bool:
+        """
+        Check if current session is still valid by navigating to protected page
+
+        Args:
+            test_url: A protected URL to test with
+            login_indicator: String in URL that indicates redirect to login
+            success_indicator: Optional selector that appears when logged in (more reliable)
+            timeout: Navigation timeout in milliseconds
+
+        Returns:
+            True if session valid, False if redirected to login
+        """
+        if not self.page:
+            raise RuntimeError("Browser not started")
+
+        logger.info(f"🔍 Checking session validity at: {test_url}")
+
+        try:
+            # Navigate to protected page
+            await self.page.goto(test_url, wait_until="domcontentloaded", timeout=timeout)
+
+            # Wait a bit for any redirects to happen
+            await asyncio.sleep(2)
+
+            # Check if redirected to login page by URL
+            current_url = self.page.url
+            if login_indicator in current_url.lower():
+                logger.warning("⚠️  Session expired - redirected to login")
+                return False
+
+            # If success_indicator provided, check if logged-in element exists
+            if success_indicator:
+                try:
+                    await self.page.wait_for_selector(
+                        success_indicator,
+                        timeout=5000,
+                        state="visible"
+                    )
+                    logger.info("✅ Session is valid (success indicator found)")
+                    return True
+                except Exception:
+                    logger.warning("⚠️  Session expired - success indicator not found")
+                    return False
+
+            logger.info("✅ Session is valid (no redirect detected)")
+            return True
+
+        except Exception as e:
+            logger.warning(f"⚠️  Session check failed: {e}")
             return False
 
     async def save_session(self, session_file: Path) -> None:
@@ -270,34 +361,14 @@ class BrowserManager:
         if not self.context:
             raise RuntimeError("Browser context not available")
 
-        # Save cookies
-        cookies = await self.context.cookies()
+        # Ensure parent directory exists
+        session_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Save storage state
+        # Save storage state (includes cookies and localStorage)
         await self.context.storage_state(path=str(session_file))
 
         logger.info(f"💾 Session saved to {session_file}")
 
-    async def load_session(self, session_file: Path) -> None:
-        """
-        Load browser session from file
-
-        Args:
-            session_file: Path to session data file
-        """
-        if not session_file.exists():
-            logger.warning(f"⚠️  Session file not found: {session_file}")
-            return
-
-        if not self.context:
-            raise RuntimeError("Browser context not available")
-
-        # Load storage state
-        await self.context.add_cookies(
-            await self.context.storage_state(path=str(session_file))
-        )
-
-        logger.info(f"📂 Session loaded from {session_file}")
 
     async def close(self) -> None:
         """Clean up and close browser"""
