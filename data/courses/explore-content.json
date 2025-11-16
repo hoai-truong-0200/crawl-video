@@ -2,47 +2,1084 @@
     "series": [
         {
             "title": "Leader’s Challenges",
-            "url": "https://unlimited.globis.co.jp/en/series/d884adf8"
+            "url": "https://unlimited.globis.co.jp/en/series/d884adf8",
+            "courses": [
+                {
+                    "title": "Leader’s Challenges: Richard Edelman",
+                    "url": "https://unlimited.globis.co.jp/en/courses/549a1731/learn/steps",
+                    "duration": "00:27:46",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Richard Edelman",
+                    "url": "https://unlimited.globis.co.jp/en/courses/549a1731/learn/steps",
+                    "duration": "00:27:46",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Dan Springer",
+                    "url": "https://unlimited.globis.co.jp/en/courses/bba116fe/learn/steps",
+                    "duration": "00:28:44",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Christophe Weber",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d675a65a/learn/steps",
+                    "duration": "00:33:59",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Organizational Development",
-            "url": "https://unlimited.globis.co.jp/en/series/3311eb30"
+            "url": "https://unlimited.globis.co.jp/en/series/3311eb30",
+            "courses": [
+                {
+                    "title": "Political Savvy: Lessons from the Horan Group",
+                    "url": "https://unlimited.globis.co.jp/en/courses/7b783540/learn/steps",
+                    "duration": "00:30:50",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Political Savvy: Lessons from the Horan Group",
+                    "url": "https://unlimited.globis.co.jp/en/courses/7b783540/learn/steps",
+                    "duration": "00:30:50",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Innovation Management: Lessons from Nissan and Toyota",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0ab04e2d/learn/steps",
+                    "duration": "00:31:20",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "HR Transformation and Change Management: Lessons from Randstad",
+                    "url": "https://unlimited.globis.co.jp/en/courses/26362b9f/learn/steps",
+                    "duration": "00:21:04",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Education and Experience: Lessons from Michelin and Nissan",
+                    "url": "https://unlimited.globis.co.jp/en/courses/aad5867f/learn/steps",
+                    "duration": "00:38:10",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Women Empowerment: Lessons from Cartier",
+                    "url": "https://unlimited.globis.co.jp/en/courses/3d1a7b20/learn/steps",
+                    "duration": "00:24:00",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Sustainable Future",
-            "url": "https://unlimited.globis.co.jp/en/series/b21c57f0"
+            "url": "https://unlimited.globis.co.jp/en/series/b21c57f0",
+            "courses": [
+                {
+                    "title": "Ventures for the future",
+                    "url": "https://unlimited.globis.co.jp/en/courses/2a9cf831/learn/steps",
+                    "duration": "00:24:55",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Ventures for the future",
+                    "url": "https://unlimited.globis.co.jp/en/courses/2a9cf831/learn/steps",
+                    "duration": "00:24:55",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Looking towards a Sustainable Future",
+                    "url": "https://unlimited.globis.co.jp/en/courses/bc212c30/learn/steps",
+                    "duration": "00:30:51",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Digital Health Challenges",
+                    "url": "https://unlimited.globis.co.jp/en/courses/291e331f/learn/steps",
+                    "duration": "00:36:32",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Finance in a Green Industry",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ab4fe5f9/learn/steps",
+                    "duration": "00:21:51",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Making a \"Green\" Career Move",
+                    "url": "https://unlimited.globis.co.jp/en/courses/913559d3/learn/steps",
+                    "duration": "00:21:54",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Sustainable Business Models",
+                    "url": "https://unlimited.globis.co.jp/en/courses/55ec6e61/learn/steps",
+                    "duration": "00:20:45",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Making Your Business Sustainable",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ce642ba3/learn/steps",
+                    "duration": "00:29:11",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "CSR in the Aviation Industry",
+                    "url": "https://unlimited.globis.co.jp/en/courses/e1a5d667/learn/steps",
+                    "duration": "00:23:04",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Creating a CSR Project",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a76e4e0d/learn/steps",
+                    "duration": "00:19:50",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The 7 Cs of Sustainability",
+                    "url": "https://unlimited.globis.co.jp/en/courses/8642bff7/learn/steps",
+                    "duration": "00:26:11",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Effect of the Climate Crisis on Business",
+                    "url": "https://unlimited.globis.co.jp/en/courses/aec33e97/learn/steps",
+                    "duration": "00:13:04",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Skill Up",
-            "url": "https://unlimited.globis.co.jp/en/series/199a583c"
+            "url": "https://unlimited.globis.co.jp/en/series/199a583c",
+            "courses": [
+                {
+                    "title": "Pitching and Scaling a Startup",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d9c81c07/learn/steps",
+                    "duration": "00:05:18",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Pitching and Scaling a Startup",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d9c81c07/learn/steps",
+                    "duration": "00:05:18",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "How to Compete as a Startup",
+                    "url": "https://unlimited.globis.co.jp/en/courses/58f005c0/learn/steps",
+                    "duration": "00:04:48",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Networking With a Purpose",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0e19fbe3/learn/steps",
+                    "duration": "00:03:28",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Doing a Lot With a Little",
+                    "url": "https://unlimited.globis.co.jp/en/courses/37a0adc4/learn/steps",
+                    "duration": "00:03:09",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Building Your Personal Brand",
+                    "url": "https://unlimited.globis.co.jp/en/courses/63de86b8/learn/steps",
+                    "duration": "00:02:50",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI in Emerging Markets with Arun Sundararajan",
+                    "url": "https://unlimited.globis.co.jp/en/courses/2e707a34/learn/steps",
+                    "duration": "00:07:21",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leading a Global Tech Company with Miki Tsusaka",
+                    "url": "https://unlimited.globis.co.jp/en/courses/5229244d/learn/steps",
+                    "duration": "00:03:52",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI and the Future of Media With Cory Ondrejka",
+                    "url": "https://unlimited.globis.co.jp/en/courses/22e9907f/learn/steps",
+                    "duration": "00:09:05",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Power of Being a Generalist",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0349dcc4/learn/steps",
+                    "duration": "00:02:51",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Mitchell Baker on Inclusive Leadership and the Open Internet",
+                    "url": "https://unlimited.globis.co.jp/en/courses/b61282c0/learn/steps",
+                    "duration": "00:06:30",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Matias Duarte on Design Fundamentals in the Wake of AI",
+                    "url": "https://unlimited.globis.co.jp/en/courses/dff5d3f5/learn/steps",
+                    "duration": "00:06:37",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Haruki Satomi on Leadership and Future Vision",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ef380af8/learn/steps",
+                    "duration": "00:03:37",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Sho Kuwamoto on Market Entry and Product Sense",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d80fd5ac/learn/steps",
+                    "duration": "00:07:06",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Tina Seelig on Creativity and Entrepreneurship",
+                    "url": "https://unlimited.globis.co.jp/en/courses/f39e85be/learn/steps",
+                    "duration": "00:04:15",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Approaching Large Clients as a Smaller Business",
+                    "url": "https://unlimited.globis.co.jp/en/courses/c7d80696/learn/steps",
+                    "duration": "00:22:08",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leading with High Energy",
+                    "url": "https://unlimited.globis.co.jp/en/courses/479f92a1/learn/steps",
+                    "duration": "00:19:26",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Entrepreneurship Advice from a Coach's Perspective",
+                    "url": "https://unlimited.globis.co.jp/en/courses/263ada3f/learn/steps",
+                    "duration": "00:32:33",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "From the Ground Up - Getting Your Foot in the Door in Japan",
+                    "url": "https://unlimited.globis.co.jp/en/courses/38cb81a6/learn/steps",
+                    "duration": "00:25:26",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Harnessing AI in Marketing",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a8871e22/learn/steps",
+                    "duration": "00:18:31",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Finding Success as an Expat",
+                    "url": "https://unlimited.globis.co.jp/en/courses/5d3a3350/learn/steps",
+                    "duration": "00:24:13",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Boosting Employee Motivation",
+                    "url": "https://unlimited.globis.co.jp/en/courses/43ff5851/learn/steps",
+                    "duration": "00:30:09",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Global Management: New Perspectives",
+                    "url": "https://unlimited.globis.co.jp/en/courses/81a161a6/learn/steps",
+                    "duration": "00:19:44",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI Tools and Psychological Safety",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a9c65a06/learn/steps",
+                    "duration": "00:28:33",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Navigating a Multigenerational Workplace",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ce07ba78/learn/steps",
+                    "duration": "00:25:29",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Top Japanese Courses",
-            "url": "https://unlimited.globis.co.jp/en/series/37251dcd"
+            "url": "https://unlimited.globis.co.jp/en/series/37251dcd",
+            "courses": [
+                {
+                    "title": "Leader’s Challenges: Fumiaki Koizumi (Subtitled)",
+                    "url": "https://unlimited.globis.co.jp/en/courses/aa55fd3d/learn/steps",
+                    "duration": "00:50:10",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Fumiaki Koizumi (Subtitled)",
+                    "url": "https://unlimited.globis.co.jp/en/courses/aa55fd3d/learn/steps",
+                    "duration": "00:50:10",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Hiroshi Mikitani (Subtitled)",
+                    "url": "https://unlimited.globis.co.jp/en/courses/8be85464/learn/steps",
+                    "duration": "00:25:56",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Motoi Oyama (Subtitled)",
+                    "url": "https://unlimited.globis.co.jp/en/courses/58ff0fc5/learn/steps",
+                    "duration": "00:52:58",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader's Challenges: Kathy Matsui (Subtitled)",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d0b0298a/learn/steps",
+                    "duration": "00:53:39",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leader’s Challenges: Masayuki Hyodo (Subtitled)",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ef3360f2/learn/steps",
+                    "duration": "00:48:27",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Seminars",
-            "url": "https://unlimited.globis.co.jp/en/series/c51015c6"
+            "url": "https://unlimited.globis.co.jp/en/series/c51015c6",
+            "courses": [
+                {
+                    "title": "What You Need to Know About AI in 2025",
+                    "url": "https://unlimited.globis.co.jp/en/courses/94642cb5/learn/steps",
+                    "duration": "01:00:19",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "What You Need to Know About AI in 2025",
+                    "url": "https://unlimited.globis.co.jp/en/courses/94642cb5/learn/steps",
+                    "duration": "01:00:19",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI Boom: The Future of Startups and VCS",
+                    "url": "https://unlimited.globis.co.jp/en/courses/03cec613/learn/steps",
+                    "duration": "00:57:35",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Politics and Corporate Communication in the Age of Fake News, AI & Disinformation",
+                    "url": "https://unlimited.globis.co.jp/en/courses/7c3916b6/learn/steps",
+                    "duration": "00:58:57",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "How to Win by Leveraging Tech & AI",
+                    "url": "https://unlimited.globis.co.jp/en/courses/707b14de/learn/steps",
+                    "duration": "00:58:14",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leadership in the New World",
+                    "url": "https://unlimited.globis.co.jp/en/courses/826e72c8/learn/steps",
+                    "duration": "01:20:14",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Nestlé Japan's Marketing Management",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0ae71e03/learn/steps",
+                    "duration": "01:15:58",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leadership in Action",
+                    "url": "https://unlimited.globis.co.jp/en/courses/8b73db1e/learn/steps",
+                    "duration": "00:46:38",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Future of Learning",
+                    "url": "https://unlimited.globis.co.jp/en/courses/022cb99b/learn/steps",
+                    "duration": "00:55:36",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI Business in Japan",
+                    "url": "https://unlimited.globis.co.jp/en/courses/35e96b91/learn/steps",
+                    "duration": "01:13:40",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Turnaround Leadership: The Differences Between Japan and the West",
+                    "url": "https://unlimited.globis.co.jp/en/courses/87f04770/learn/steps",
+                    "duration": "00:40:09",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Future of Knowledge Sharing",
+                    "url": "https://unlimited.globis.co.jp/en/courses/1891ef11/learn/steps",
+                    "duration": "00:56:15",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI First Companies - Implementation and Impact",
+                    "url": "https://unlimited.globis.co.jp/en/courses/b8b3a1f3/learn/steps",
+                    "duration": "01:37:22",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Using Japanese Values to Thrive in Global Business",
+                    "url": "https://unlimited.globis.co.jp/en/courses/67f47567/learn/steps",
+                    "duration": "01:33:30",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "iRobot: Home Robots Empowering People to Do More",
+                    "url": "https://unlimited.globis.co.jp/en/courses/8610158d/learn/steps",
+                    "duration": "01:35:13",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "An Investor's Lesson to Entrepreneurs",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9f6cf145/learn/steps",
+                    "duration": "01:45:24",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Jazz: The Model for Leadership and Innovation for the 21st-Century",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0cfe4481/learn/steps",
+                    "duration": "01:01:41",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Technovate in the Era of Industry 4.0",
+                    "url": "https://unlimited.globis.co.jp/en/courses/5ca03591/learn/steps",
+                    "duration": "00:50:17",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Evernote Founder: How Tech Startups Can Break through in Japan",
+                    "url": "https://unlimited.globis.co.jp/en/courses/51da1f96/learn/steps",
+                    "duration": "01:38:53",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Alibaba Story: Lessons from a Former Insider",
+                    "url": "https://unlimited.globis.co.jp/en/courses/7cb99f5c/learn/steps",
+                    "duration": "01:27:09",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "G1 Global Conference",
-            "url": "https://unlimited.globis.co.jp/en/series/6d6d7dee"
+            "url": "https://unlimited.globis.co.jp/en/series/6d6d7dee",
+            "courses": [
+                {
+                    "title": "How to Upskill Our People in the Age of AI",
+                    "url": "https://unlimited.globis.co.jp/en/courses/029b3ce3/learn/steps",
+                    "duration": "00:58:27",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "How to Upskill Our People in the Age of AI",
+                    "url": "https://unlimited.globis.co.jp/en/courses/029b3ce3/learn/steps",
+                    "duration": "00:58:27",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Leadership in the Technovate & AI Era: What Should Leaders Do To Win?",
+                    "url": "https://unlimited.globis.co.jp/en/courses/3412b507/learn/steps",
+                    "duration": "00:55:41",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Global Founders in Japan",
+                    "url": "https://unlimited.globis.co.jp/en/courses/1fcd43bd/learn/steps",
+                    "duration": "00:58:29",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Creating Value with AI: Its Path to Adoption in Business and Daily Life",
+                    "url": "https://unlimited.globis.co.jp/en/courses/e612afc9/learn/steps",
+                    "duration": "01:01:10",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "From Lab to Market: How to Turn Scientific Insights into Business Reality",
+                    "url": "https://unlimited.globis.co.jp/en/courses/bb3f1d49/learn/steps",
+                    "duration": "00:58:34",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "How to Combat Fake News in an AI-driven World",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d70c32fb/learn/steps",
+                    "duration": "01:01:30",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Divided US Society",
+                    "url": "https://unlimited.globis.co.jp/en/courses/605c7338/learn/steps",
+                    "duration": "00:59:28",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Tech & AI: Leadership in Periods of Accelerating Transformation",
+                    "url": "https://unlimited.globis.co.jp/en/courses/90fc4300/learn/steps",
+                    "duration": "00:59:11",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Tech & Design",
+                    "url": "https://unlimited.globis.co.jp/en/courses/09de361d/learn/steps",
+                    "duration": "00:59:19",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Investing in the Blue Economy: Exploring Sustainable Solutions for Ocean Conservation",
+                    "url": "https://unlimited.globis.co.jp/en/courses/974935da/learn/steps",
+                    "duration": "00:58:37",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "De-Risking Global Supply Chains in an Unpredictable World",
+                    "url": "https://unlimited.globis.co.jp/en/courses/7540a97a/learn/steps",
+                    "duration": "00:58:22",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Business Case for Generative AI",
+                    "url": "https://unlimited.globis.co.jp/en/courses/1cdff7e3/learn/steps",
+                    "duration": "00:56:47",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "CEO Session: What's on Your Mind?",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a4e92a00/learn/steps",
+                    "duration": "00:58:37",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Competition & Co-Invention in Generative AI: Recent Developments and Applications",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9098cf0f/learn/steps",
+                    "duration": "01:00:27",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Intersection of Design and Business",
+                    "url": "https://unlimited.globis.co.jp/en/courses/6bacc6dd/learn/steps",
+                    "duration": "01:00:41",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Generative AI: The Next Big Platform Shift",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d40fce0a/learn/steps",
+                    "duration": "00:59:36",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Venture Capital and the Investment Climate",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ea442b3d/learn/steps",
+                    "duration": "00:59:19",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Economic Outlook: Inflation, Financial Stability, and New Global Realities",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9e2a5270/learn/steps",
+                    "duration": "00:58:57",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Crafting a Grand Design for Entrepreneurship in a Post-Covid World",
+                    "url": "https://unlimited.globis.co.jp/en/courses/f2eb3844/learn/steps",
+                    "duration": "01:01:37",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "A Roaring Decade of Web 3.0: Crafting a Grand Design for Applying Web 3.0 Technology",
+                    "url": "https://unlimited.globis.co.jp/en/courses/34728f6d/learn/steps",
+                    "duration": "00:55:44",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Japan’s Tourism 2.0: Tourism, Culture and Regional Development",
+                    "url": "https://unlimited.globis.co.jp/en/courses/39c7a489/learn/steps",
+                    "duration": "00:59:02",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "A Grand Design of Women’s Empowerment: 100 Years Later, Why Are We Not There Yet?",
+                    "url": "https://unlimited.globis.co.jp/en/courses/5dfc1d86/learn/steps",
+                    "duration": "00:57:26",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Crafting a Grand Design of PM Kishida’s New Capitalism: What Comes Next?",
+                    "url": "https://unlimited.globis.co.jp/en/courses/102364e3/learn/steps",
+                    "duration": "00:59:56",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Social Media & Digital Communications: Impact on Global Public Opinion",
+                    "url": "https://unlimited.globis.co.jp/en/courses/ca06dbb4/learn/steps",
+                    "duration": "00:57:46",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Office Sensei",
-            "url": "https://unlimited.globis.co.jp/en/series/546e0364"
+            "url": "https://unlimited.globis.co.jp/en/series/546e0364",
+            "courses": [
+                {
+                    "title": "Office Sensei | Ep 11: Nomikai",
+                    "url": "https://unlimited.globis.co.jp/en/courses/6acb9ba5/learn/steps",
+                    "duration": "00:16:30",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 11: Nomikai",
+                    "url": "https://unlimited.globis.co.jp/en/courses/6acb9ba5/learn/steps",
+                    "duration": "00:16:30",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 10: Kokorozashi",
+                    "url": "https://unlimited.globis.co.jp/en/courses/c51d8531/learn/steps",
+                    "duration": "00:26:54",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 9: Hansei",
+                    "url": "https://unlimited.globis.co.jp/en/courses/013ee4ac/learn/steps",
+                    "duration": "00:09:32",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 8: Omotenashi",
+                    "url": "https://unlimited.globis.co.jp/en/courses/1b1c9838/learn/steps",
+                    "duration": "00:11:57",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 7: Train Etiquette",
+                    "url": "https://unlimited.globis.co.jp/en/courses/97162c44/learn/steps",
+                    "duration": "00:09:15",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 6: Cool Biz",
+                    "url": "https://unlimited.globis.co.jp/en/courses/1d5cdb67/learn/steps",
+                    "duration": "00:05:32",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 5: AI Workflows",
+                    "url": "https://unlimited.globis.co.jp/en/courses/cea601c7/learn/steps",
+                    "duration": "00:09:11",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 4: Kamiza",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a1ff559d/learn/steps",
+                    "duration": "00:06:20",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 3: Business Cards",
+                    "url": "https://unlimited.globis.co.jp/en/courses/3e4ecb6a/learn/steps",
+                    "duration": "00:06:18",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 2: Hou-Ren-Sou",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a279515c/learn/steps",
+                    "duration": "00:06:45",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Office Sensei | Ep 1: Nemawashi",
+                    "url": "https://unlimited.globis.co.jp/en/courses/5a3c07e2/learn/steps",
+                    "duration": "00:06:53",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "...Basically",
-            "url": "https://unlimited.globis.co.jp/en/series/0be78db2"
+            "url": "https://unlimited.globis.co.jp/en/series/0be78db2",
+            "courses": [
+                {
+                    "title": "Internet of Things… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/4f8c2a10/learn/steps",
+                    "duration": "00:03:57",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Internet of Things… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/4f8c2a10/learn/steps",
+                    "duration": "00:03:57",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Neural Networks… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/8145c4f1/learn/steps",
+                    "duration": "00:03:37",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Investments… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/2676e602/learn/steps",
+                    "duration": "00:02:56",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Vaccines… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/784ecf78/learn/steps",
+                    "duration": "00:03:43",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "AI Ethics... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/41f3ead2/learn/steps",
+                    "duration": "00:03:12",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Climate Change… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/366de82e/learn/steps",
+                    "duration": "00:04:01",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Oligarchy… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/f124d29f/learn/steps",
+                    "duration": "00:04:01",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Edge Computing… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d2144be5/learn/steps",
+                    "duration": "00:03:24",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "SDGs… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9871e3d0/learn/steps",
+                    "duration": "00:03:10",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Circular Economy… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d95baf80/learn/steps",
+                    "duration": "00:02:59",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Shell Corporations… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/8f93f8e8/learn/steps",
+                    "duration": "00:03:21",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "DEI... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/dd0e0b04/learn/steps",
+                    "duration": "00:02:49",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Gig Economy… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/3b355688/learn/steps",
+                    "duration": "00:03:28",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Negotiation… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/55ef4956/learn/steps",
+                    "duration": "00:02:34",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Crypto… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/de1f4d2b/learn/steps",
+                    "duration": "00:02:55",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "The Algorithm… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/93bf6341/learn/steps",
+                    "duration": "00:02:35",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Digital Marketing... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a5179e91/learn/steps",
+                    "duration": "00:03:51",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Tariffs... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9d9ed786/learn/steps",
+                    "duration": "00:02:41",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Data Economy… Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0c3826ca/learn/steps",
+                    "duration": "00:02:22",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "SEO... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/bb5de6f3/learn/steps",
+                    "duration": "00:03:38",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Blockchain... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/a75832ff/learn/steps",
+                    "duration": "00:02:39",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Black Friday... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/3d1922c0/learn/steps",
+                    "duration": "00:02:53",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Cybersecurity... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/6f5ab389/learn/steps",
+                    "duration": "00:04:15",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Greenwashing... Basically",
+                    "url": "https://unlimited.globis.co.jp/en/courses/d1c5419d/learn/steps",
+                    "duration": "00:01:52",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Rhymes to Riches",
-            "url": "https://unlimited.globis.co.jp/en/series/a6dcb956"
+            "url": "https://unlimited.globis.co.jp/en/series/a6dcb956",
+            "courses": [
+                {
+                    "title": "Rhymes to Riches | Effective Emails",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9034268d/learn/steps",
+                    "duration": "00:07:46",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Rhymes to Riches | Effective Emails",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9034268d/learn/steps",
+                    "duration": "00:07:46",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Rhymes to Riches | Presentation Skills",
+                    "url": "https://unlimited.globis.co.jp/en/courses/03036c04/learn/steps",
+                    "duration": "00:07:55",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         },
         {
             "title": "Healthdesk",
-            "url": "https://unlimited.globis.co.jp/en/series/fd7597f5"
+            "url": "https://unlimited.globis.co.jp/en/series/fd7597f5",
+            "courses": [
+                {
+                    "title": "Healthdesk | Hips, Glutes & Hamstrings",
+                    "url": "https://unlimited.globis.co.jp/en/courses/c1957898/learn/steps",
+                    "duration": "00:01:41",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Healthdesk | Hips, Glutes & Hamstrings",
+                    "url": "https://unlimited.globis.co.jp/en/courses/c1957898/learn/steps",
+                    "duration": "00:01:41",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Healthdesk | Upper & Lower Back Relief",
+                    "url": "https://unlimited.globis.co.jp/en/courses/964a038a/learn/steps",
+                    "duration": "00:02:05",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Healthdesk | Neck and Shoulder Release",
+                    "url": "https://unlimited.globis.co.jp/en/courses/547fc364/learn/steps",
+                    "duration": "00:02:05",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Healthdesk | Leg Pain",
+                    "url": "https://unlimited.globis.co.jp/en/courses/0ba7c976/learn/steps",
+                    "duration": "00:01:34",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Healthdesk | Lower Back Pain",
+                    "url": "https://unlimited.globis.co.jp/en/courses/b508132c/learn/steps",
+                    "duration": "00:02:10",
+                    "last_updated": "",
+                    "videos": []
+                },
+                {
+                    "title": "Healthdesk | Preventing Pain at Your Desk",
+                    "url": "https://unlimited.globis.co.jp/en/courses/9d191959/learn/steps",
+                    "duration": "00:02:04",
+                    "last_updated": "",
+                    "videos": []
+                }
+            ]
         }
     ]
 }

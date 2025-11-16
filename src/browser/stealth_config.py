@@ -6,7 +6,7 @@ Works in conjunction with playwright-stealth plugin.
 """
 
 from typing import Dict, Any, Optional
-from playwright.sync_api import BrowserContext, Page
+from playwright.async_api import BrowserContext, Page
 
 
 def get_stealth_init_scripts() -> list[str]:
@@ -190,7 +190,7 @@ def get_playwright_stealth_config() -> Dict[str, Any]:
     }
 
 
-def apply_stealth_to_context(context: BrowserContext) -> None:
+async def apply_stealth_to_context(context: BrowserContext) -> None:
     """
     Apply stealth configurations to browser context
 
@@ -199,10 +199,10 @@ def apply_stealth_to_context(context: BrowserContext) -> None:
     """
     # Add init scripts
     for script in get_stealth_init_scripts():
-        context.add_init_script(script)
+        await context.add_init_script(script)
 
     # Set extra HTTP headers to look more realistic
-    context.set_extra_http_headers({
+    await context.set_extra_http_headers({
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
         "Sec-Fetch-Dest": "document",
@@ -213,7 +213,7 @@ def apply_stealth_to_context(context: BrowserContext) -> None:
     })
 
 
-def apply_stealth_to_page(page: Page) -> None:
+async def apply_stealth_to_page(page: Page) -> None:
     """
     Apply additional stealth measures to a specific page
 
@@ -221,7 +221,7 @@ def apply_stealth_to_page(page: Page) -> None:
         page: Playwright Page
     """
     # Mask automation indicators in page context
-    page.add_init_script("""
+    await page.add_init_script("""
     // Final webdriver cleanup
     Object.defineProperty(navigator, 'webdriver', {
         get: () => false
@@ -247,19 +247,12 @@ def get_browser_launch_args() -> list[str]:
         List of browser arguments
     """
     return [
-        "--no-sandbox",
         "--disable-blink-features=AutomationControlled",
         "--disable-dev-shm-usage",
-        "--disable-web-security",
-        "--disable-features=IsolateOrigins,site-per-process",
-        "--allow-running-insecure-content",
-        "--disable-setuid-sandbox",
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-infobars",
         "--window-size=1920,1080",
-        "--disable-blink-features=AutomationControlled",
-        "--disable-features=site-per-process",
         "--disable-features=TranslateUI",
         "--disable-background-networking",
         "--disable-background-timer-throttling",
@@ -269,8 +262,6 @@ def get_browser_launch_args() -> list[str]:
         "--disable-component-update",
         "--disable-default-apps",
         "--disable-domain-reliability",
-        "--disable-extensions",
-        "--disable-features=AudioServiceOutOfProcess",
         "--disable-hang-monitor",
         "--disable-ipc-flooding-protection",
         "--disable-notifications",
@@ -280,13 +271,10 @@ def get_browser_launch_args() -> list[str]:
         "--disable-prompt-on-repost",
         "--disable-renderer-backgrounding",
         "--disable-sync",
-        "--hide-scrollbars",
-        "--ignore-certificate-errors",
         "--metrics-recording-only",
         "--mute-audio",
         "--no-pings",
         "--password-store=basic",
-        "--use-mock-keychain",
         "--force-color-profile=srgb",
     ]
 

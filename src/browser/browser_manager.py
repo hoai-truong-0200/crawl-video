@@ -116,7 +116,7 @@ class BrowserManager:
         logger.info("✅ Browser context created")
 
         # Apply stealth to context
-        apply_stealth_to_context(self.context)
+        await apply_stealth_to_context(self.context)
         logger.info("🥷 Stealth mode applied to context")
 
         # Add fingerprint override script
@@ -129,7 +129,7 @@ class BrowserManager:
         self.page = await self.context.new_page()
 
         # Apply stealth to page
-        apply_stealth_to_page(self.page)
+        await apply_stealth_to_page(self.page)
 
         # Initialize behavior simulator
         self.behavior_sim = HumanBehaviorSimulator(
@@ -144,7 +144,7 @@ class BrowserManager:
 
         return self.page
 
-    async def navigate_to(self, url: str, wait_for: str = "networkidle") -> None:
+    async def navigate_to(self, url: str, wait_for: str = "domcontentloaded") -> None:
         """
         Navigate to URL with human-like behavior
 
@@ -259,35 +259,19 @@ class BrowserManager:
         start_time = asyncio.get_event_loop().time()
 
         try:
-            while True:
-                # Check if timed out
-                if (asyncio.get_event_loop().time() - start_time) * 1000 > timeout:
-                    raise TimeoutError("Login timeout exceeded")
+            # Wait for success indicator to appear (more reliable)
+            await self.page.wait_for_selector(
+                success_indicator,
+                timeout=timeout,
+                state="visible"
+            )
 
-                # Wait a bit
-                await asyncio.sleep(2)
+            logger.info("✅ Login successful (success indicator found)!")
 
-                # Check if URL changed (no longer on login page)
-                current_url = self.page.url
-                if login_url_pattern not in current_url.lower():
-                    logger.info(f"✅ URL changed from login page: {current_url}")
+            # Wait a bit more for page to stabilize after login
+            await asyncio.sleep(2)
 
-                    # Wait for page to stabilize
-                    await asyncio.sleep(3)
-
-                    # Try to find success indicator
-                    try:
-                        await self.page.wait_for_selector(
-                            success_indicator,
-                            timeout=10000,
-                            state="attached"
-                        )
-                        logger.info("✅ Login successful (success indicator found)!")
-                        return True
-                    except:
-                        # Even if indicator not found, if URL changed, consider it success
-                        logger.info("✅ Login successful (URL changed from login page)!")
-                        return True
+            return True
 
         except Exception as e:
             logger.error(f"❌ Login timeout or failed: {e}")
