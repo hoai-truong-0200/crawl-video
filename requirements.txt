@@ -16,6 +16,9 @@ playwright-stealth>=1.0.0
 # Video Download
 # ============================================
 yt-dlp>=2024.10.0
+secretstorage>=3.4.0
+pycryptodomex>=3.23.0
+curl-cffi>=0.13.0
 
 # ============================================
 # Google Drive API
@@ -29,6 +32,7 @@ google-api-python-client>=2.100.0
 # HTTP Client
 # ============================================
 httpx[http2]>=0.25.0
+aiohttp>=3.9.0
 aiofiles>=23.0.0
 
 # ============================================

@@ -2,7 +2,7 @@
 
 > **Mục tiêu**: Crawl video courses từ GLOBIS Unlimited, download và upload lên Google Drive tự động
 
-**Tổng tiến độ**: 8/25 tasks (32%)
+**Tổng tiến độ**: 18/25 tasks (72%)
 
 ---
 
@@ -18,8 +18,8 @@
 ### Architecture
 ```
 src/
-├── browser/          # Anti-detection browser setup
-├── crawler/          # Course & video metadata crawling
+├── browser/          # Anti-detection browser setup ✅
+├── crawler/          # Course & video metadata crawling ✅
 ├── downloader/       # Video download với yt-dlp
 ├── uploader/         # Google Drive integration
 └── utils/            # Session, logging, helpers
@@ -98,82 +98,114 @@ src/
 
 ---
 
-## Phase 3: Crawling Metadata (0/6)
+## Phase 3: Crawling Categories & Series (6/6) ✅
 
-- [ ] **Task 9**: Module đọc danh sách categories từ learn-content.json
-  - Load JSON file
-  - Validate structure
-  - Parse categories list
-  - File: `src/crawler/data_loader.py`
+- [x] **Task 9**: Module quản lý content (categories, courses, videos) ✅
+  - ContentManager class với load/save JSON
+  - Dataclasses: Category, Course, Video
+  - Statistics tracking
+  - File: [src/crawler/content_manager.py](src/crawler/content_manager.py)
 
-- [ ] **Task 10**: Crawler truy cập từng category URL với human-like behavior
-  - Navigate với delays
-  - Scroll và hover
-  - Wait for dynamic content
-  - File: `src/crawler/category_crawler.py`
+- [x] **Task 10**: CategoryParser để extract course info từ category pages ✅
+  - Parse course cards từ category pages
+  - Extract: title, URL, duration, last_updated
+  - Filter by duration
+  - File: [src/crawler/category_parser.py](src/crawler/category_parser.py)
 
-- [ ] **Task 11**: Parser extract thông tin course
-  - Extract: title, URL, last_updated
-  - Handle multiple courses per category
-  - Validate extracted data
-  - File: `src/crawler/course_parser.py`
+- [x] **Task 11**: CategoryCrawler để crawl tất cả categories ✅
+  - Navigate to each category page
+  - Extract courses using CategoryParser
+  - Human-like behavior với delays
+  - Retry logic và error handling
+  - Save to learn-content.json
+  - File: [src/crawler/category_crawler.py](src/crawler/category_crawler.py)
 
-- [ ] **Task 12**: Crawler truy cập từng course với scrolling/hovering
-  - Navigate to course detail page
-  - Simulate human reading behavior
-  - Extract video list section
-  - File: `src/crawler/course_detail_crawler.py`
+- [x] **Task 12**: SeriesCrawler để crawl series pages ✅
+  - Crawl từ explore page (series/playlists)
+  - Extract courses từ series
+  - Similar structure to CategoryCrawler
+  - Save to explore-content.json
+  - File: [src/crawler/series_crawler.py](src/crawler/series_crawler.py)
 
-- [ ] **Task 13**: Parser extract thông tin video
-  - Extract: video title, URL
-  - Handle video player embeds
-  - Parse video metadata
-  - File: `src/crawler/video_parser.py`
+- [x] **Task 13**: run_browser.py - Main automation script ✅
+  - Integrated workflow script
+  - Chrome profile management
+  - Manual login detection
+  - Multiple modes: test, crawl, series, all
+  - Anti-bot protection
+  - File: [run_browser.py](run_browser.py)
 
-- [ ] **Task 14**: Lưu dữ liệu vào learn-content.json
-  - Update JSON structure
-  - Preserve existing data
-  - Validate final output
-  - File: `src/crawler/data_saver.py`
-
----
-
-## Phase 4: Video Download (0/2)
-
-- [ ] **Task 15**: Module network interception để bắt video URLs
-  - Playwright network monitoring
-  - Intercept Vimeo requests
-  - Extract m3u8/mpd manifests
-  - Parse quality options
-  - File: `src/downloader/video_detector.py`
-
-- [ ] **Task 16**: Video downloader với yt-dlp + progress tracking
-  - yt-dlp integration
-  - Progress bar với tqdm
-  - Retry mechanism (3 attempts)
-  - Resume incomplete downloads
-  - Quality selection (720p > 1080p > 480p)
-  - File: `src/downloader/video_downloader.py`
+- [x] **Task 14**: Test và verify category/series crawling ✅
+  - Tested CategoryCrawler successfully
+  - Tested SeriesCrawler successfully
+  - learn-content.json populated with courses
+  - explore-content.json populated with series
 
 ---
 
-## Phase 5: Google Drive Upload (0/3)
+## Phase 4: Crawling Videos (2/2) ✅
 
-- [ ] **Task 17**: Setup Google Drive API authentication
+- [x] **Task 15**: CourseParser để extract video info từ course pages ✅
+  - Parse step list từ course sidebar
+  - Extract step info: title, URL, duration, step_id
+  - Extract Vimeo URL từ iframe
+  - Extract Vimeo video ID
+  - File: [src/crawler/course_parser.py](src/crawler/course_parser.py)
+
+- [x] **Task 16**: CourseCrawler để crawl videos từ tất cả courses ✅
+  - Load courses từ learn-content.json / explore-content.json
+  - Navigate to each course page
+  - Extract all steps (video lessons)
+  - Navigate to each step to extract Vimeo URL
+  - Update JSON with video information (title, url, vimeo_url)
+  - Human-like delays and retry logic
+  - Statistics tracking
+  - Integration vào run_browser.py (mode: videos, all)
+  - Files: [src/crawler/course_crawler.py](src/crawler/course_crawler.py), [test_course_parser.py](test_course_parser.py), [test_single_course_crawl.py](test_single_course_crawl.py)
+
+---
+
+## Phase 5: Video Download (2/2) ✅
+
+- [x] **Task 17**: DOM-based video URL extraction ✅
+  - Extract URLs from `window.playerConfig` in Vimeo iframe
+  - Support progressive MP4, HLS, and DASH formats
+  - Automatic quality selection (best available)
+  - Parse all available video formats
+  - VimeoExtractor class with robust error handling
+  - File: [src/downloader/vimeo_extractor.py](src/downloader/vimeo_extractor.py)
+
+- [x] **Task 18**: Video downloader với auto-download (progressive + HLS/DASH) ✅
+  - Progressive MP4: Direct download với aiohttp
+  - HLS/DASH: yt-dlp automatic download
+  - Retry mechanism (3 attempts với exponential backoff)
+  - Proper temp file handling (.mp4.part)
+  - Quality selection (best quality first)
+  - Update JSON với download status
+  - Integration với CourseCrawler
+  - Files: [src/downloader/video_downloader.py](src/downloader/video_downloader.py), [test_single_video_download.py](test_single_video_download.py)
+  - Documentation: [PHASE5_COMPLETE.md](PHASE5_COMPLETE.md)
+
+---
+
+## Phase 6: Google Drive Upload (0/3)
+
+- [ ] **Task 19**: Setup Google Drive API authentication
   - Create Google Cloud project
   - Enable Drive API
   - Setup Service Account hoặc OAuth2
   - Download credentials.json
   - File: `src/uploader/auth.py`
 
-- [ ] **Task 18**: Drive uploader với resumable upload
+- [ ] **Task 20**: Drive uploader với resumable upload
   - MediaFileUpload với resumable=True
   - Chunk size: 10MB
   - Progress tracking
   - Error handling và retry
+  - Update JSON với drive_file_id
   - File: `src/uploader/drive_uploader.py`
 
-- [ ] **Task 19**: Folder organization theo category/course structure
+- [ ] **Task 21**: Folder organization theo category/course structure
   - Create folders hierarchy
   - Organize: Category > Course > Videos
   - Check existing files (skip duplicates)
@@ -181,46 +213,34 @@ src/
 
 ---
 
-## Phase 6: Production Ready (0/6)
+## Phase 7: Production Ready (0/4)
 
-- [ ] **Task 20**: Session & state management
+- [ ] **Task 22**: Session & state management
   - Save progress to JSON/SQLite
   - Resume from last checkpoint
   - Track: downloaded videos, uploaded videos, failed items
   - File: `src/utils/session_manager.py`
 
-- [ ] **Task 21**: Rate limiting & request throttling
-  - Max requests per minute
-  - Exponential backoff
-  - Respect site's rate limits
-  - File: `src/utils/rate_limiter.py`
+- [ ] **Task 23**: Enhanced error handling & logging
+  - Structured logging với loguru
+  - Error recovery strategies
+  - Retry với exponential backoff
+  - File: `src/utils/error_handler.py`
 
-- [ ] **Task 22**: Error handling & logging
-  - Setup loguru logger
-  - Log levels: DEBUG, INFO, WARNING, ERROR
-  - Rotating file handler
-  - Structured logging
-  - File: `src/utils/logger.py`
-
-- [ ] **Task 23**: Main orchestrator script
+- [ ] **Task 24**: Main orchestrator script improvements
   - CLI interface với argparse
-  - Workflow: Crawl > Download > Upload
+  - Full workflow: Crawl > Download > Upload
   - Resume capability
   - Progress summary
+  - Statistics dashboard
   - File: `main.py`
 
-- [ ] **Task 24**: Testing & optimization
-  - Test anti-detection effectiveness
-  - Test resumable downloads
-  - Test Drive upload
+- [ ] **Task 25**: Testing & Documentation
+  - Test end-to-end workflow
   - Optimize concurrent operations
   - Memory usage optimization
-
-- [ ] **Task 25**: Documentation
-  - README.md với setup instructions
-  - Usage examples
-  - Configuration guide
-  - Troubleshooting section
+  - Complete usage documentation
+  - Troubleshooting guide
   - File: `docs/USAGE.md`
 
 ---
@@ -231,26 +251,56 @@ src/
 |-------|-------|-----------|----------|
 | Phase 1: Setup & Foundation | 3 | 3 | 100% ✅ |
 | Phase 2: Anti-Detection & Browser | 5 | 5 | 100% ✅ |
-| Phase 3: Crawling Metadata | 6 | 0 | 0% |
-| Phase 4: Video Download | 2 | 0 | 0% |
-| Phase 5: Google Drive Upload | 3 | 0 | 0% |
-| Phase 6: Production Ready | 6 | 0 | 0% |
-| **TOTAL** | **25** | **8** | **32%** |
+| Phase 3: Crawling Categories & Series | 6 | 6 | 100% ✅ |
+| Phase 4: Crawling Videos | 2 | 2 | 100% ✅ |
+| Phase 5: Video Download | 2 | 2 | 100% ✅ |
+| Phase 6: Google Drive Upload | 3 | 0 | 0% |
+| Phase 7: Production Ready | 4 | 0 | 0% |
+| **TOTAL** | **25** | **18** | **72%** |
 
 ---
 
-## 🎯 Next Steps
+## 🎯 Current Status & Next Steps
 
-1. ✅ Phase 1: Setup & Foundation - COMPLETED (100%)
-2. ✅ Phase 2: Anti-Detection & Browser - COMPLETED (100%)
-3. 🔄 Phase 3: Crawling Metadata (NEXT)
-   - Task 9: Data loader for categories
-   - Task 10: Category crawler
-   - Task 11: Course parser
-   - Task 12: Course detail crawler
-   - Task 13: Video parser
-   - Task 14: Data saver
+### ✅ Completed (Phases 1-5)
+1. ✅ **Phase 1**: Setup & Foundation - COMPLETED (100%)
+2. ✅ **Phase 2**: Anti-Detection & Browser - COMPLETED (100%)
+3. ✅ **Phase 3**: Crawling Categories & Series - COMPLETED (100%)
+4. ✅ **Phase 4**: Crawling Videos - COMPLETED (100%)
+5. ✅ **Phase 5**: Video Download (DOM extraction + Auto-download) - COMPLETED (100%)
+
+### 📹 Available Commands
+```bash
+# Test single category parsing
+python3 run_browser.py test
+
+# Crawl all categories (learn-content.json)
+python3 run_browser.py crawl
+
+# Crawl all series (explore-content.json)
+python3 run_browser.py series
+
+# Crawl videos from all courses (NEW!)
+python3 run_browser.py videos
+
+# Full crawl: categories + series + videos (NEW!)
+python3 run_browser.py all
+
+# Test single course video crawl (quick test)
+python3 test_single_course_crawl.py
+
+# Test course parser only
+python3 test_course_parser.py
+```
+
+### 🔄 Phase 6: Google Drive Upload (NEXT)
+- Task 19: Google Drive API authentication
+- Task 20: Drive uploader with resumable upload
+- Task 21: Folder organization by category/course structure
+
+**Ready to proceed with Google Drive integration!**
 
 ---
 
-**Last Updated**: 2025-11-13
+**Last Updated**: 2025-11-18
+**Current Phase**: 5 Complete, Moving to Phase 6

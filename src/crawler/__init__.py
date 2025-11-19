@@ -10,6 +10,7 @@ from .category_crawler import CategoryCrawler
 from .series_crawler import SeriesCrawler
 from .course_parser import CourseParser, StepInfo
 from .course_crawler import CourseCrawler
+from .vimeo_interceptor import VimeoInterceptor, VimeoDownloadURL
 
 __all__ = [
     'ContentManager',
@@ -23,4 +24,6 @@ __all__ = [
     'CourseParser',
     'StepInfo',
     'CourseCrawler',
+    'VimeoInterceptor',
+    'VimeoDownloadURL',
 ]

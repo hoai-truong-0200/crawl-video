@@ -14,7 +14,8 @@ Usage:
     python3 run_browser.py test     # Test single category parsing
     python3 run_browser.py crawl    # Crawl all categories (learn-content)
     python3 run_browser.py series   # Crawl all series (explore-content)
-    python3 run_browser.py all      # Crawl both categories and series
+    python3 run_browser.py videos   # Crawl videos from all courses
+    python3 run_browser.py all      # Crawl categories + series + videos
 
 Future updates: Just modify this single file
 """
@@ -498,6 +499,54 @@ async def crawl_all_series(page):
 
 
 # ============================================================
+# STEP 4D: CRAWL VIDEOS FROM ALL COURSES
+# ============================================================
+
+async def crawl_all_videos(page, content_file=None):
+    """
+    Crawl videos from all courses in learn-content.json or explore-content.json
+
+    Args:
+        page: Playwright Page object
+        content_file: Path to content file (defaults to LEARN_CONTENT_FILE)
+    """
+
+    if content_file is None:
+        content_file = LEARN_CONTENT_FILE
+
+    logger.info("\n" + "=" * 60)
+    logger.info(f"🎬 CRAWL VIDEOS FROM ALL COURSES")
+    logger.info(f"   Content file: {content_file}")
+    logger.info("=" * 60)
+
+    try:
+        # Create crawler
+        crawler = CourseCrawler(
+            content_file=content_file,
+            min_delay=1.5,
+            max_delay=3.0,
+            max_retries=3,
+        )
+
+        # Crawl all courses to extract videos
+        stats = await crawler.crawl_all_courses(page)
+
+        # Show summary
+        logger.info("\n" + "=" * 60)
+        logger.info("✅ VIDEO CRAWLING COMPLETE")
+        logger.info("=" * 60)
+        logger.info(f"📊 Results saved to: {content_file}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Video crawler error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+# ============================================================
 # MAIN WORKFLOW
 # ============================================================
 
@@ -506,7 +555,7 @@ async def main(mode: str = "test"):
     Main workflow
 
     Args:
-        mode: "test", "crawl", "series", or "all"
+        mode: "test", "crawl", "series", "videos", or "all"
     """
 
     logger.info("\n" + "=" * 70)
@@ -582,8 +631,46 @@ async def main(mode: str = "test"):
             # Close browser automatically
             logger.info("\n👋 Closing browser...")
 
+        elif mode == "videos":
+            logger.info("\n🎬 STEP 4: Crawl Videos from All Courses")
+
+            # Ask which content file to crawl
+            logger.info("\nCrawling videos from both learn-content and explore-content...")
+
+            # Crawl learn-content first
+            logger.info("\n📚 Part 1: Crawling videos from learn-content.json...")
+            learn_success = await crawl_all_videos(page, LEARN_CONTENT_FILE)
+
+            if learn_success:
+                logger.info(f"✅ Learn content videos done: {LEARN_CONTENT_FILE}")
+            else:
+                logger.error("❌ Learn content video crawling failed")
+
+            # Wait between crawls
+            logger.info("\n⏳ Waiting 10 seconds before explore content...")
+            await asyncio.sleep(10)
+
+            # Crawl explore-content
+            logger.info("\n🎬 Part 2: Crawling videos from explore-content.json...")
+            explore_success = await crawl_all_videos(page, EXPLORE_CONTENT_FILE)
+
+            if explore_success:
+                logger.info(f"✅ Explore content videos done: {EXPLORE_CONTENT_FILE}")
+            else:
+                logger.error("❌ Explore content video crawling failed")
+
+            # Final summary
+            logger.info("\n" + "=" * 70)
+            logger.info("✅ VIDEO CRAWLING COMPLETE")
+            logger.info("=" * 70)
+            logger.info(f"📊 Learn content: {LEARN_CONTENT_FILE}")
+            logger.info(f"📊 Explore content: {EXPLORE_CONTENT_FILE}")
+
+            # Close browser
+            logger.info("\n👋 Closing browser...")
+
         elif mode == "all":
-            logger.info("\n🚀 STEP 4: Crawl Everything (Categories + Series)")
+            logger.info("\n🚀 STEP 4: Crawl Everything (Categories + Series + Videos)")
 
             # Crawl categories first
             logger.info("\n📚 Part 1: Crawling Categories...")
@@ -607,19 +694,46 @@ async def main(mode: str = "test"):
             else:
                 logger.error("❌ Series crawling failed")
 
+            # Wait before video crawling
+            logger.info("\n⏳ Waiting 10 seconds before video crawling...")
+            await asyncio.sleep(10)
+
+            # Crawl videos from learn-content
+            logger.info("\n📹 Part 3: Crawling videos from learn-content...")
+            learn_videos_success = await crawl_all_videos(page, LEARN_CONTENT_FILE)
+
+            if learn_videos_success:
+                logger.info(f"✅ Learn content videos done: {LEARN_CONTENT_FILE}")
+            else:
+                logger.error("❌ Learn content video crawling failed")
+
+            # Wait between video crawls
+            logger.info("\n⏳ Waiting 10 seconds...")
+            await asyncio.sleep(10)
+
+            # Crawl videos from explore-content
+            logger.info("\n📹 Part 4: Crawling videos from explore-content...")
+            explore_videos_success = await crawl_all_videos(page, EXPLORE_CONTENT_FILE)
+
+            if explore_videos_success:
+                logger.info(f"✅ Explore content videos done: {EXPLORE_CONTENT_FILE}")
+            else:
+                logger.error("❌ Explore content video crawling failed")
+
             # Final summary
             logger.info("\n" + "=" * 70)
             logger.info("✅ ALL CRAWLING COMPLETE")
             logger.info("=" * 70)
             logger.info(f"📊 Categories: {LEARN_CONTENT_FILE}")
             logger.info(f"📊 Series: {EXPLORE_CONTENT_FILE}")
+            logger.info(f"📊 Videos: Both files updated with video information")
 
             # Close browser
             logger.info("\n👋 Closing browser...")
 
         else:
             logger.error(f"❌ Invalid mode: {mode}")
-            logger.info("Valid modes: 'test', 'crawl', 'series', 'all'")
+            logger.info("Valid modes: 'test', 'crawl', 'series', 'videos', 'all'")
 
     finally:
         # Cleanup
@@ -635,13 +749,14 @@ if __name__ == "__main__":
         mode = sys.argv[1].lower()
 
     # Validate mode
-    if mode not in ["test", "crawl", "series", "all"]:
+    if mode not in ["test", "crawl", "series", "videos", "all"]:
         logger.error(f"❌ Invalid mode: {mode}")
-        logger.info("Usage: python3 run_browser.py [test|crawl|series|all]")
+        logger.info("Usage: python3 run_browser.py [test|crawl|series|videos|all]")
         logger.info("  test   - Test single category parsing (default)")
         logger.info("  crawl  - Crawl all categories (learn-content)")
         logger.info("  series - Crawl all series (explore-content)")
-        logger.info("  all    - Crawl both categories and series")
+        logger.info("  videos - Crawl videos from all courses")
+        logger.info("  all    - Crawl categories + series + videos")
         sys.exit(1)
 
     asyncio.run(main(mode))

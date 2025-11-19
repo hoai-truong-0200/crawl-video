@@ -14,6 +14,8 @@ from loguru import logger
 
 from .course_parser import CourseParser, StepInfo
 from .content_manager import ContentManager, Video
+from ..browser.human_behavior import HumanBehaviorSimulator
+from ..downloader import VideoDownloader, VimeoExtractor
 
 
 class CourseCrawler:
@@ -35,6 +37,9 @@ class CourseCrawler:
         min_delay: float = 1.5,
         max_delay: float = 3.0,
         max_retries: int = 3,
+        enable_human_behavior: bool = True,
+        enable_download: bool = True,
+        download_dir: Path = Path("downloads"),
     ):
         """
         Initialize course crawler
@@ -45,15 +50,29 @@ class CourseCrawler:
             min_delay: Minimum delay between requests (seconds)
             max_delay: Maximum delay between requests (seconds)
             max_retries: Maximum retry attempts for failed requests
+            enable_human_behavior: Enable human-like behavior (scrolling, mouse movements)
+            enable_download: Enable video downloading
+            download_dir: Base directory for video downloads
         """
         self.content_file = content_file
         self.parser = parser or CourseParser()
         self.min_delay = min_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
+        self.enable_human_behavior = enable_human_behavior
+        self.enable_download = enable_download
 
         # Content manager for loading/saving JSON
         self.content_manager = ContentManager(content_file)
+
+        # Detect content type from file path
+        content_type = "learn-content" if "learn-content" in str(content_file) else "explore-content"
+
+        # Video downloader
+        self.downloader = VideoDownloader(
+            download_dir=Path("data/downloads"),
+            content_type=content_type
+        )
 
         # Statistics
         self.stats = {
@@ -62,6 +81,8 @@ class CourseCrawler:
             "total_videos_found": 0,
             "videos_with_vimeo": 0,
             "videos_without_vimeo": 0,
+            "videos_downloaded": 0,
+            "videos_download_failed": 0,
             "errors": [],
         }
 
@@ -112,7 +133,9 @@ class CourseCrawler:
                 logger.info(f"🔗 URL: {course.url}")
 
                 # Crawl course with retry logic
-                videos = await self._crawl_course_with_retry(page, course.url, course.title)
+                videos = await self._crawl_course_with_retry(
+                    page, course.url, course.title, category, course
+                )
 
                 if videos:
                     # Update course videos
@@ -128,6 +151,11 @@ class CourseCrawler:
                     logger.info(f"✅ Successfully crawled {len(videos)} videos")
                     logger.info(f"   - With Vimeo URL: {videos_with_vimeo}")
                     logger.info(f"   - Without Vimeo URL: {len(videos) - videos_with_vimeo}")
+
+                    # Save immediately after each successful course
+                    logger.info(f"💾 Saving progress to {self.content_file.name}...")
+                    self.content_manager.save()
+                    logger.info(f"✅ Progress saved!")
                 else:
                     self.stats["courses_failed"] += 1
                     logger.warning(f"⚠️  Failed to crawl course")
@@ -138,12 +166,13 @@ class CourseCrawler:
                     logger.info(f"⏳ Waiting {delay:.1f}s before next course...")
                     await asyncio.sleep(delay)
 
-        # Save updated content
+        # Final save (in case last course failed)
         logger.info(f"\n{'=' * 70}")
-        logger.info("💾 SAVING RESULTS")
+        logger.info("💾 FINAL SAVE")
         logger.info(f"{'=' * 70}")
 
         self.content_manager.save()
+        logger.info(f"✅ All progress saved to {self.content_file}")
 
         # Print final statistics
         self._print_statistics()
@@ -155,6 +184,8 @@ class CourseCrawler:
         page: Page,
         course_url: str,
         course_title: str,
+        category: Optional['Category'] = None,
+        course: Optional['Course'] = None,
     ) -> Optional[List[Video]]:
         """
         Crawl a single course with retry logic
@@ -163,6 +194,8 @@ class CourseCrawler:
             page: Playwright Page object
             course_url: Course page URL
             course_title: Course title (for logging)
+            category: Category object (for download path)
+            course: Course object (for JSON updates)
 
         Returns:
             List of Video objects or None if failed
@@ -183,6 +216,28 @@ class CourseCrawler:
 
                 # Wait for page to settle
                 await asyncio.sleep(random.uniform(1.5, 2.5))
+
+                # Human-like behavior: Scroll and read course page
+                if self.enable_human_behavior:
+                    logger.debug("🖱️  Simulating human behavior on course page...")
+
+                    # Create human behavior simulator for this page
+                    behavior = HumanBehaviorSimulator(page)
+
+                    # Scroll down to view course content
+                    await behavior.human_scroll(
+                        direction="down",
+                        distance=random.randint(300, 600)
+                    )
+
+                    # Small pause to "read" the content
+                    await asyncio.sleep(random.uniform(0.8, 1.5))
+
+                    # Scroll back up a bit (natural reading pattern)
+                    await behavior.human_scroll(
+                        direction="up",
+                        distance=random.randint(100, 200)
+                    )
 
                 # Parse course page to get steps
                 steps = await self.parser.parse_course_page(page)
@@ -215,20 +270,105 @@ class CourseCrawler:
                         # Wait for video player to load
                         await asyncio.sleep(random.uniform(1.0, 2.0))
 
-                        # Extract Vimeo URL
-                        vimeo_url = await self.parser.extract_vimeo_url(page)
+                        # Human-like behavior: Move mouse and simulate viewing
+                        if self.enable_human_behavior:
+                            # Create behavior simulator
+                            behavior = HumanBehaviorSimulator(page)
 
-                        # Create Video object
+                            # Try to find video player and move mouse to it
+                            try:
+                                video_player = await page.query_selector('iframe[src*="vimeo"]')
+                                if video_player:
+                                    # Get video player position
+                                    box = await video_player.bounding_box()
+                                    if box:
+                                        # Move mouse to center of video player
+                                        target_x = box['x'] + box['width'] / 2
+                                        target_y = box['y'] + box['height'] / 2
+
+                                        await behavior.move_mouse_to(
+                                            target_x,
+                                            target_y
+                                        )
+
+                                        # Small pause like watching the preview
+                                        await asyncio.sleep(random.uniform(0.5, 1.0))
+                            except Exception as e:
+                                logger.debug(f"Could not move mouse to video player: {e}")
+
+                            # Small scroll to simulate engagement
+                            await behavior.human_scroll(
+                                direction="down",
+                                distance=random.randint(100, 200)
+                            )
+
+                        # Step 1: Create Video object with basic info (title + url)
                         video = Video(
                             title=step.title,
                             url=step.url,
-                            vimeo_url=vimeo_url or "",
+                            vimeo_url="",  # Will be filled after extraction
                             downloaded=False,
                             uploaded_to_drive=False,
                             drive_file_id=""
                         )
 
+                        # Step 2: Add video to list and save to JSON immediately
                         videos.append(video)
+
+                        # Save progress to JSON after adding video info (if course object provided)
+                        if course:
+                            course.videos = videos
+                            self.content_manager.save()
+                            logger.debug(f"      💾 Saved video info to JSON: {step.title}")
+
+                        # Step 3: Extract video URLs from DOM using VimeoExtractor
+                        logger.debug("      🔍 Extracting video URLs from DOM...")
+                        video_urls = await VimeoExtractor.extract_video_urls(page, timeout=10000)
+
+                        vimeo_url = None
+                        best_download_url = None
+
+                        if video_urls:
+                            vimeo_url = video_urls.get('vimeo_player_url', '')
+                            best_download_url = video_urls.get('best_download_url', '')
+                            logger.debug(f"      ✅ Extracted URLs - Vimeo: {vimeo_url}")
+                            logger.debug(f"      ✅ Best download URL: {best_download_url[:100]}...")
+
+                            # Update video with vimeo_url
+                            video.vimeo_url = vimeo_url or ""
+                            if course:
+                                self.content_manager.save()
+                        else:
+                            logger.warning("      ⚠️  Failed to extract video URLs from DOM")
+
+                        # Step 4: Download video if enabled and best_download_url found
+                        if self.enable_download and best_download_url and category and course:
+                            # Get category/series name and course name
+                            category_or_series = category.title
+                            course_name = course.title
+
+                            logger.info(f"      📥 Starting download: {step.title}")
+
+                            # Download video using extracted URL (DOM-based)
+                            download_success = await self.downloader.download_from_extracted_url(
+                                download_url=best_download_url,
+                                category_or_series=category_or_series,
+                                course_name=course_name,
+                                video_title=step.title,
+                            )
+
+                            # Step 5: Update JSON with download status
+                            if download_success:
+                                video.downloaded = True
+                                self.stats["videos_downloaded"] += 1
+                                logger.info(f"      ✅ Download complete & JSON updated")
+                            else:
+                                self.stats["videos_download_failed"] += 1
+                                logger.error(f"      ❌ Download failed")
+
+                            # Save download status to JSON
+                            if course:
+                                self.content_manager.save()
 
                         if vimeo_url:
                             logger.info(f"      ✅ Vimeo URL: {vimeo_url}")
@@ -280,6 +420,16 @@ class CourseCrawler:
         logger.info(f"   - With Vimeo URL: {self.stats['videos_with_vimeo']}")
         logger.info(f"   - Without Vimeo URL: {self.stats['videos_without_vimeo']}")
 
+        # Download statistics
+        if self.enable_download:
+            logger.info(f"📥 Video Downloads:")
+            logger.info(f"   - Downloaded: {self.stats['videos_downloaded']}")
+            logger.info(f"   - Failed: {self.stats['videos_download_failed']}")
+
+            if self.stats['videos_downloaded'] > 0:
+                download_stats = self.downloader.get_download_stats()
+                logger.info(f"💾 Storage: {download_stats['total_size_mb']:.1f} MB")
+
         if self.stats['courses_crawled'] > 0:
             avg_videos = self.stats['total_videos_found'] / self.stats['courses_crawled']
             logger.info(f"📈 Average videos per course: {avg_videos:.1f}")
@@ -287,6 +437,10 @@ class CourseCrawler:
             if self.stats['total_videos_found'] > 0:
                 success_rate = (self.stats['videos_with_vimeo'] / self.stats['total_videos_found']) * 100
                 logger.info(f"📈 Vimeo extraction success rate: {success_rate:.1f}%")
+
+            if self.enable_download and self.stats['total_videos_found'] > 0:
+                download_rate = (self.stats['videos_downloaded'] / self.stats['total_videos_found']) * 100
+                logger.info(f"📈 Download success rate: {download_rate:.1f}%")
 
         if self.stats['errors']:
             logger.info(f"\n⚠️  Errors encountered: {len(self.stats['errors'])}")

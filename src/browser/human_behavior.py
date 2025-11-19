@@ -2,7 +2,7 @@
 Human Behavior Simulation
 
 Simulates realistic human interactions:
-- Mouse movements with bezier curves
+- Mouse movements with bezier curvesHumanBehaviorSimulator
 - Natural scrolling patterns
 - Random pauses and hesitations
 - Realistic reading behavior
