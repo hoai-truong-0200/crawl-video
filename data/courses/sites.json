@@ -1,6 +1,10 @@
 {
-    "links": [
+    "en": [
         "https://unlimited.globis.co.jp/en/learn-content",
         "https://unlimited.globis.co.jp/en/explore-content"
+    ],
+    "ja": [
+        "https://unlimited.globis.co.jp/ja/learn-content",
+        "https://unlimited.globis.co.jp/ja/explore-content"
     ]
 }

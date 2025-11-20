@@ -12,8 +12,9 @@ from typing import List, Optional, Dict
 from playwright.async_api import Page
 from loguru import logger
 
+from datetime import datetime
 from .category_parser import CategoryParser, CourseInfo
-from .content_manager import ContentManager, Course
+from .content_manager import ContentManager, Category, Course
 
 
 class CategoryCrawler:
@@ -30,7 +31,8 @@ class CategoryCrawler:
 
     def __init__(
         self,
-        content_file: Path = Path("data/courses/learn-content.json"),
+        content_file: Path = Path("data/courses/en/learn-content.json"),
+        language: str = "en",
         parser: Optional[CategoryParser] = None,
         min_delay: float = 2.0,
         max_delay: float = 5.0,
@@ -41,19 +43,21 @@ class CategoryCrawler:
 
         Args:
             content_file: Path to learn-content.json
+            language: Language code (en/ja)
             parser: CategoryParser instance (creates new if None)
             min_delay: Minimum delay between requests (seconds)
             max_delay: Maximum delay between requests (seconds)
             max_retries: Maximum retry attempts for failed requests
         """
         self.content_file = content_file
+        self.language = language
         self.parser = parser or CategoryParser()
         self.min_delay = min_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
 
-        # Content manager for loading/saving JSON
-        self.content_manager = ContentManager(content_file)
+        # Content manager for loading/saving JSON with language support
+        self.content_manager = ContentManager(content_file, language=language)
 
         # Statistics
         self.stats = {
@@ -106,18 +110,23 @@ class CategoryCrawler:
             courses = await self._crawl_category_with_retry(page, category_url)
 
             if courses:
-                # Convert CourseInfo to Course objects
+                # Convert CourseInfo to Course objects with new schema
                 course_objects = []
                 for course_info in courses:
-                    course_obj = Course()
-                    course_obj.title = course_info.title
-                    course_obj.url = course_info.url
-                    course_obj.last_updated = ""  # Will be set when crawling videos
-                    course_obj.videos = []
+                    course_obj = Course(
+                        title=course_info.title,
+                        url=course_info.url,
+                        overview="",  # Will be set when crawling course details
+                        transcript="",  # Will be set when crawling course details
+                        duration=0,  # Will be set when crawling course details
+                        last_updated=datetime.now().isoformat(),
+                        learning_points=[]  # Will be filled when crawling videos
+                    )
                     course_objects.append(course_obj)
 
-                # Update category courses
+                # Update category courses and last_updated timestamp
                 category.courses = course_objects
+                category.last_updated = datetime.now().isoformat()
 
                 self.stats["categories_crawled"] += 1
                 self.stats["total_courses_found"] += len(courses)

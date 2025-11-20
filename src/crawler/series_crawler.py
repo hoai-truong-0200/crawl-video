@@ -7,13 +7,14 @@ Crawls series pages from GLOBIS Unlimited explore-content.
 import asyncio
 import json
 import random
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict
 from playwright.async_api import Page
 from loguru import logger
 
 from .category_parser import CategoryParser, CourseInfo
-from .content_manager import Course
+from .content_manager import ContentManager, Series, Course
 
 
 class SeriesCrawler:
@@ -26,7 +27,8 @@ class SeriesCrawler:
 
     def __init__(
         self,
-        content_file: Path = Path("data/courses/explore-content.json"),
+        content_file: Path = Path("data/courses/en/explore-content.json"),
+        language: str = "en",
         parser: Optional[CategoryParser] = None,
         min_delay: float = 2.0,
         max_delay: float = 5.0,
@@ -37,16 +39,21 @@ class SeriesCrawler:
 
         Args:
             content_file: Path to explore-content.json
+            language: Language code (en/ja)
             parser: CategoryParser instance (reuses same parser)
             min_delay: Minimum delay between requests (seconds)
             max_delay: Maximum delay between requests (seconds)
             max_retries: Maximum retry attempts for failed requests
         """
         self.content_file = content_file
+        self.language = language
         self.parser = parser or CategoryParser()
         self.min_delay = min_delay
         self.max_delay = max_delay
         self.max_retries = max_retries
+
+        # Content manager for loading/saving JSON with language support
+        self.content_manager = ContentManager(content_file, language=language)
 
         # Statistics
         self.stats = {
@@ -70,39 +77,28 @@ class SeriesCrawler:
         logger.info("🎬 STARTING SERIES CRAWLER (EXPLORE CONTENT)")
         logger.info("=" * 70)
 
-        # Load series data
-        if not self.content_file.exists():
-            logger.error(f"❌ Content file not found: {self.content_file}")
-            return self.stats
+        # Load series data using ContentManager
+        self.content_manager.load()
 
-        try:
-            with open(self.content_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception as e:
-            logger.error(f"❌ Failed to load content file: {e}")
-            return self.stats
-
-        series_list = data.get('series', [])
-
-        if not series_list:
+        if not self.content_manager.series:
             logger.error("❌ No series found in explore-content.json")
             return self.stats
 
-        logger.info(f"📚 Found {len(series_list)} series to crawl")
+        logger.info(f"📚 Found {len(self.content_manager.series)} series to crawl")
         logger.info(f"⏱️  Delay between requests: {self.min_delay}-{self.max_delay}s")
         logger.info(f"🔄 Max retries per series: {self.max_retries}")
 
         # Crawl each series
-        for idx, series in enumerate(series_list, 1):
-            series_title = series.get('title', 'Unknown')
-            series_url = series.get('url', '')
+        for idx, series in enumerate(self.content_manager.series, 1):
+            series_title = series.title
+            series_url = series.url
 
             if not series_url:
-                logger.warning(f"[{idx}/{len(series_list)}] ⚠️  Skipping '{series_title}' - no URL")
+                logger.warning(f"[{idx}/{len(self.content_manager.series)}] ⚠️  Skipping '{series_title}' - no URL")
                 continue
 
             logger.info("\n" + "=" * 70)
-            logger.info(f"🎬 [{idx}/{len(series_list)}] {series_title}")
+            logger.info(f"🎬 [{idx}/{len(self.content_manager.series)}] {series_title}")
             logger.info("=" * 70)
             logger.info(f"🔗 URL: {series_url}")
 
@@ -110,19 +106,23 @@ class SeriesCrawler:
             courses = await self._crawl_series_with_retry(page, series_url)
 
             if courses:
-                # Convert CourseInfo to dict
-                course_dicts = []
+                # Convert CourseInfo to Course objects with new schema
+                course_objects = []
                 for course_info in courses:
-                    course_dicts.append({
-                        'title': course_info.title,
-                        'url': course_info.url,
-                        'duration': course_info.duration or "",
-                        'last_updated': "",
-                        'videos': []
-                    })
+                    course_obj = Course(
+                        title=course_info.title,
+                        url=course_info.url,
+                        overview="",  # Will be set when crawling course details
+                        transcript="",  # Will be set when crawling course details
+                        duration=0,  # Will be set when crawling course details
+                        last_updated=datetime.now().isoformat(),
+                        learning_points=[]  # Will be filled when crawling videos
+                    )
+                    course_objects.append(course_obj)
 
-                # Update series courses
-                series['courses'] = course_dicts
+                # Update series courses and last_updated timestamp
+                series.courses = course_objects
+                series.last_updated = datetime.now().isoformat()
 
                 self.stats["series_crawled"] += 1
                 self.stats["total_courses_found"] += len(courses)
@@ -132,27 +132,20 @@ class SeriesCrawler:
                 self.stats["series_failed"] += 1
                 logger.warning(f"⚠️  Failed to crawl series")
                 # Still keep series in JSON, just with empty courses
-                series['courses'] = []
+                series.courses = []
 
             # Human-like delay before next series
-            if idx < len(series_list):
+            if idx < len(self.content_manager.series):
                 delay = random.uniform(self.min_delay, self.max_delay)
                 logger.info(f"⏳ Waiting {delay:.1f}s before next series...")
                 await asyncio.sleep(delay)
 
-        # Save updated content
+        # Save updated content using ContentManager
         logger.info("\n" + "=" * 70)
         logger.info("💾 SAVING RESULTS")
         logger.info("=" * 70)
 
-        try:
-            self.content_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.content_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            logger.info(f"✅ Content saved to {self.content_file}")
-        except Exception as e:
-            logger.error(f"❌ Failed to save content: {e}")
-            self.stats["errors"].append(f"Save failed: {e}")
+        self.content_manager.save()
 
         # Print final statistics
         self._print_statistics()

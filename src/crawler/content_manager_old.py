@@ -63,24 +63,19 @@ class Course:
     Fields:
         title: Course title
         url: Course page URL
-        overview: Path to overview.txt file (e.g., "en/Category/Course/overview.txt")
-        transcript: Path to transcript.txt file (e.g., "en/Category/Course/transcript.txt")
+        overview: Course description/overview
+        transcript: Full course transcript (if available)
         duration: Total course duration in minutes
         last_updated: ISO 8601 timestamp
         learning_points: List of LearnPoints (replaces flat videos list)
-
-    Note:
-        - overview and transcript store FILE PATHS, not content
-        - Actual text content is saved in .txt files in the course directory
-        - This keeps JSON file size manageable
     """
     title: str = ""
     url: str = ""
-    overview: str = ""  # Path to overview.txt (relative to downloads/)
-    transcript: str = ""  # Path to transcript.txt (relative to downloads/)
-    duration: int = 0  # Duration in minutes
+    overview: str = ""  # NEW: Course description
+    transcript: str = ""  # NEW: Course transcript
+    duration: int = 0  # NEW: Duration in minutes
     last_updated: str = ""
-    learning_points: List[LearnPoint] = field(default_factory=list)  # LearnPoint structure
+    learning_points: List[LearnPoint] = field(default_factory=list)  # NEW: LearnPoint structure
 
     def __post_init__(self):
         if self.learning_points is None:
@@ -128,27 +123,20 @@ class Series:
 class ContentManager:
     """Manage learn-content.json file"""
 
-    def __init__(self, content_file: Path, language: str = "en"):
+    def __init__(self, content_file: Path):
         """
         Initialize content manager
 
         Args:
-            content_file: Path to learn-content.json or explore-content.json
-            language: Language code (en/ja)
+            content_file: Path to learn-content.json
         """
         self.content_file = content_file
-        self.language = language
-        self.root_last_updated = ""
         self.categories: List[Category] = []
 
-        logger.info(f"📚 Content Manager initialized: {content_file} ({language})")
+        logger.info(f"📚 Content Manager initialized: {content_file}")
 
     def load(self) -> None:
-        """
-        Load content from JSON file
-
-        Supports both old format (flat videos) and new format (LearnPoint structure)
-        """
+        """Load content from JSON file"""
         if not self.content_file.exists():
             logger.warning(f"⚠️  Content file not found: {self.content_file}")
             return
@@ -157,79 +145,26 @@ class ContentManager:
             with open(self.content_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # Get language and last_updated from root (if present)
-            self.language = data.get('language', 'en')
-            self.root_last_updated = data.get('last_updated', '')
-
             self.categories = []
             for cat_data in data.get('categories', []):
                 # Parse courses
                 courses = []
                 for course_data in cat_data.get('courses', []):
+                    # Parse videos
+                    videos = []
+                    for video_data in course_data.get('videos', []):
+                        videos.append(Video(**video_data))
 
-                    # NEW FORMAT: Parse learning_points (if present)
-                    if 'learning_points' in course_data:
-                        learning_points = []
-                        for lp_data in course_data.get('learning_points', []):
-                            # Parse videos in this LearnPoint
-                            videos = []
-                            for video_data in lp_data.get('videos', []):
-                                videos.append(Video(
-                                    title=video_data.get('title', ''),
-                                    url=video_data.get('url', ''),
-                                    vimeo_url=video_data.get('vimeo_url', ''),
-                                    learning_point=video_data.get('learning_point', ''),
-                                    downloaded=video_data.get('downloaded', False),
-                                    download_path=video_data.get('download_path', ''),
-                                    last_updated=video_data.get('last_updated', '')
-                                ))
-
-                            learning_points.append(LearnPoint(
-                                title=lp_data.get('title', ''),
-                                videos=videos
-                            ))
-
-                        courses.append(Course(
-                            title=course_data.get('title', ''),
-                            url=course_data.get('url', ''),
-                            overview=course_data.get('overview', ''),
-                            transcript=course_data.get('transcript', ''),
-                            duration=course_data.get('duration', 0),
-                            last_updated=course_data.get('last_updated', ''),
-                            learning_points=learning_points
-                        ))
-
-                    # OLD FORMAT: Parse flat videos list (backward compatibility)
-                    else:
-                        videos = []
-                        for video_data in course_data.get('videos', []):
-                            videos.append(Video(
-                                title=video_data.get('title', ''),
-                                url=video_data.get('url', ''),
-                                vimeo_url=video_data.get('vimeo_url', ''),
-                                learning_point='',  # Empty for old format
-                                downloaded=video_data.get('downloaded', False),
-                                download_path='',
-                                last_updated=''
-                            ))
-
-                        # Convert to LearnPoint structure (single default LearnPoint)
-                        default_lp = LearnPoint(title='Default', videos=videos)
-
-                        courses.append(Course(
-                            title=course_data.get('title', ''),
-                            url=course_data.get('url', ''),
-                            overview='',
-                            transcript='',
-                            duration=0,
-                            last_updated=course_data.get('last_updated', ''),
-                            learning_points=[default_lp] if videos else []
-                        ))
+                    courses.append(Course(
+                        title=course_data.get('title', ''),
+                        url=course_data.get('url', ''),
+                        last_updated=course_data.get('last_updated', ''),
+                        videos=videos
+                    ))
 
                 self.categories.append(Category(
                     title=cat_data.get('title', ''),
                     url=cat_data.get('url', ''),
-                    last_updated=cat_data.get('last_updated', ''),
                     courses=courses
                 ))
 
@@ -240,53 +175,32 @@ class ContentManager:
             raise
 
     def save(self) -> None:
-        """
-        Save content to JSON file with NEW schema
-
-        Includes language, last_updated, and LearnPoint structure
-        """
+        """Save content to JSON file"""
         try:
             # Ensure parent directory exists
             self.content_file.parent.mkdir(parents=True, exist_ok=True)
 
-            # Update root last_updated if not set
-            if not self.root_last_updated:
-                self.root_last_updated = datetime.now().isoformat()
-
-            # Convert to dict with NEW schema
+            # Convert to dict
             data = {
-                'language': self.language,
-                'last_updated': self.root_last_updated,
                 'categories': [
                     {
                         'title': cat.title,
                         'url': cat.url,
-                        'last_updated': cat.last_updated or datetime.now().isoformat(),
                         'courses': [
                             {
                                 'title': course.title,
                                 'url': course.url,
-                                'overview': course.overview,
-                                'transcript': course.transcript,
-                                'duration': course.duration,
-                                'last_updated': course.last_updated or datetime.now().isoformat(),
-                                'learning_points': [
+                                'last_updated': course.last_updated,
+                                'videos': [
                                     {
-                                        'title': lp.title,
-                                        'videos': [
-                                            {
-                                                'title': video.title,
-                                                'url': video.url,
-                                                'vimeo_url': video.vimeo_url,
-                                                'learning_point': video.learning_point,
-                                                'downloaded': video.downloaded,
-                                                'download_path': video.download_path,
-                                                'last_updated': video.last_updated or datetime.now().isoformat()
-                                            }
-                                            for video in lp.videos
-                                        ]
+                                        'title': video.title,
+                                        'url': video.url,
+                                        'vimeo_url': video.vimeo_url,
+                                        'downloaded': video.downloaded,
+                                        'uploaded_to_drive': video.uploaded_to_drive,
+                                        'drive_file_id': video.drive_file_id
                                     }
-                                    for lp in course.learning_points
+                                    for video in course.videos
                                 ]
                             }
                             for course in cat.courses
@@ -298,7 +212,7 @@ class ContentManager:
 
             # Write to file with pretty formatting
             with open(self.content_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(data, f, indent=4, ensure_ascii=False)
 
             logger.info(f"💾 Content saved to {self.content_file}")
 
@@ -371,27 +285,21 @@ class ContentManager:
         logger.warning(f"⚠️  Course not found: {course_title}")
 
     def get_stats(self) -> Dict[str, int]:
-        """Get statistics about the content (NEW schema with LearnPoints)"""
+        """Get statistics about the content"""
         total_categories = len(self.categories)
         total_courses = sum(len(cat.courses) for cat in self.categories)
-
-        # Count videos across all LearnPoints
         total_videos = sum(
-            len(lp.videos)
+            len(course.videos)
             for cat in self.categories
             for course in cat.courses
-            for lp in course.learning_points
         )
-
         downloaded_videos = sum(
-            sum(1 for video in lp.videos if video.downloaded)
+            sum(1 for video in course.videos if video.downloaded)
             for cat in self.categories
             for course in cat.courses
-            for lp in course.learning_points
         )
-
-        total_learning_points = sum(
-            len(course.learning_points)
+        uploaded_videos = sum(
+            sum(1 for video in course.videos if video.uploaded_to_drive)
             for cat in self.categories
             for course in cat.courses
         )
@@ -399,10 +307,11 @@ class ContentManager:
         return {
             'categories': total_categories,
             'courses': total_courses,
-            'learning_points': total_learning_points,
             'videos': total_videos,
             'downloaded': downloaded_videos,
-            'pending_download': total_videos - downloaded_videos
+            'uploaded': uploaded_videos,
+            'pending_download': total_videos - downloaded_videos,
+            'pending_upload': downloaded_videos - uploaded_videos
         }
 
     def print_stats(self) -> None:
@@ -412,11 +321,11 @@ class ContentManager:
         print("\n" + "="*60)
         print("📊 CONTENT STATISTICS")
         print("="*60)
-        print(f"Language:          {self.language.upper()}")
         print(f"Categories:        {stats['categories']}")
         print(f"Courses:           {stats['courses']}")
-        print(f"Learning Points:   {stats['learning_points']}")
         print(f"Videos:            {stats['videos']}")
         print(f"Downloaded:        {stats['downloaded']} / {stats['videos']}")
+        print(f"Uploaded to Drive: {stats['uploaded']} / {stats['videos']}")
         print(f"Pending Download:  {stats['pending_download']}")
+        print(f"Pending Upload:    {stats['pending_upload']}")
         print("="*60 + "\n")

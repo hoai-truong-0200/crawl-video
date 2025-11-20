@@ -1,0 +1,33 @@
+{
+  "categories": [
+    {
+      "title": "Old Category",
+      "url": "/old/category",
+      "courses": [
+        {
+          "title": "Old Course",
+          "url": "/old/course",
+          "last_updated": "2025-01-01",
+          "videos": [
+            {
+              "title": "Old Video 1",
+              "url": "/old/video1",
+              "vimeo_url": "https://player.vimeo.com/video/999",
+              "downloaded": false,
+              "uploaded_to_drive": false,
+              "drive_file_id": ""
+            },
+            {
+              "title": "Old Video 2",
+              "url": "/old/video2",
+              "vimeo_url": "https://player.vimeo.com/video/998",
+              "downloaded": true,
+              "uploaded_to_drive": false,
+              "drive_file_id": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

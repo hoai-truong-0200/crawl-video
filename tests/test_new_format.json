@@ -1,0 +1,51 @@
+{
+  "language": "en",
+  "last_updated": "2025-11-20T21:53:00.928163",
+  "categories": [
+    {
+      "title": "Test Category",
+      "url": "/en/categories/test",
+      "last_updated": "2025-11-20T21:53:00.927849",
+      "courses": [
+        {
+          "title": "Test Course",
+          "url": "/en/courses/test/learn/steps",
+          "overview": "This is a test course",
+          "transcript": "Test transcript",
+          "duration": 30,
+          "last_updated": "2025-11-20T21:53:00.927843",
+          "learning_points": [
+            {
+              "title": "Introduction",
+              "videos": [
+                {
+                  "title": "Video 1",
+                  "url": "/en/courses/test/steps/1",
+                  "vimeo_url": "https://player.vimeo.com/video/111",
+                  "learning_point": "Introduction",
+                  "downloaded": false,
+                  "download_path": "",
+                  "last_updated": "2025-11-20T21:53:00.927823"
+                }
+              ]
+            },
+            {
+              "title": "Main Content",
+              "videos": [
+                {
+                  "title": "Video 2",
+                  "url": "/en/courses/test/steps/2",
+                  "vimeo_url": "https://player.vimeo.com/video/222",
+                  "learning_point": "Main Content",
+                  "downloaded": true,
+                  "download_path": "downloads/en/Test/Course/Main Content/Video 2.mp4",
+                  "last_updated": "2025-11-20T21:53:00.927833"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

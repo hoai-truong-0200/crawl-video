@@ -1,0 +1,37 @@
+{
+  "language": "en",
+  "last_updated": "2025-11-21T00:41:58.159375",
+  "categories": [
+    {
+      "title": "Test Category",
+      "url": "/test/category",
+      "last_updated": "2025-11-21T00:41:58.159167",
+      "courses": [
+        {
+          "title": "Test Course",
+          "url": "/test/course",
+          "overview": "Test overview",
+          "transcript": "Test transcript",
+          "duration": 30,
+          "last_updated": "2025-11-21T00:41:58.159158",
+          "learning_points": [
+            {
+              "title": "Introduction",
+              "videos": [
+                {
+                  "title": "Test Video",
+                  "url": "/test/video",
+                  "vimeo_url": "https://player.vimeo.com/video/123",
+                  "learning_point": "Introduction",
+                  "downloaded": false,
+                  "download_path": "",
+                  "last_updated": "2025-11-21T00:41:58.159141"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

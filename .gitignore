@@ -12,8 +12,7 @@ dist/
 build/
 
 # Project specific
-data/downloads/*
-!data/downloads/.gitkeep
+downloads/*
 logs/*
 !logs/.gitkeep
 data/sessions/*

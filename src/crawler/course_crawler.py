@@ -7,13 +7,14 @@ to extract video information (steps) for each course.
 
 import asyncio
 import random
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict
 from playwright.async_api import Page
 from loguru import logger
 
 from .course_parser import CourseParser, StepInfo
-from .content_manager import ContentManager, Video
+from .content_manager import ContentManager, Video, LearnPoint
 from ..browser.human_behavior import HumanBehaviorSimulator
 from ..downloader import VideoDownloader, VimeoExtractor
 
@@ -32,13 +33,14 @@ class CourseCrawler:
 
     def __init__(
         self,
-        content_file: Path = Path("data/courses/learn-content.json"),
+        content_file: Path = Path("data/courses/en/learn-content.json"),
+        language: str = "en",
         parser: Optional[CourseParser] = None,
         min_delay: float = 1.5,
         max_delay: float = 3.0,
         max_retries: int = 3,
         enable_human_behavior: bool = True,
-        enable_download: bool = True,
+        enable_download: bool = False,
         download_dir: Path = Path("downloads"),
     ):
         """
@@ -46,15 +48,17 @@ class CourseCrawler:
 
         Args:
             content_file: Path to learn-content.json or explore-content.json
+            language: Language code (en/ja)
             parser: CourseParser instance (creates new if None)
             min_delay: Minimum delay between requests (seconds)
             max_delay: Maximum delay between requests (seconds)
             max_retries: Maximum retry attempts for failed requests
             enable_human_behavior: Enable human-like behavior (scrolling, mouse movements)
-            enable_download: Enable video downloading
+            enable_download: Enable video downloading (default: False for course crawling)
             download_dir: Base directory for video downloads
         """
         self.content_file = content_file
+        self.language = language
         self.parser = parser or CourseParser()
         self.min_delay = min_delay
         self.max_delay = max_delay
@@ -62,15 +66,15 @@ class CourseCrawler:
         self.enable_human_behavior = enable_human_behavior
         self.enable_download = enable_download
 
-        # Content manager for loading/saving JSON
-        self.content_manager = ContentManager(content_file)
+        # Content manager for loading/saving JSON with language support
+        self.content_manager = ContentManager(content_file, language=language)
 
         # Detect content type from file path
         content_type = "learn-content" if "learn-content" in str(content_file) else "explore-content"
 
         # Video downloader
         self.downloader = VideoDownloader(
-            download_dir=Path("data/downloads"),
+            download_dir=Path("downloads") / language,
             content_type=content_type
         )
 
@@ -132,25 +136,31 @@ class CourseCrawler:
                 logger.info(f"\n🎓 Course [{course_counter}/{total_courses}]: {course.title}")
                 logger.info(f"🔗 URL: {course.url}")
 
-                # Crawl course with retry logic
-                videos = await self._crawl_course_with_retry(
+                # Crawl course with retry logic (returns list of LearnPoint objects)
+                learning_points = await self._crawl_course_with_retry(
                     page, course.url, course.title, category, course
                 )
 
-                if videos:
-                    # Update course videos
-                    course.videos = videos
+                if learning_points:
+                    # Update course with LearnPoint structure
+                    course.learning_points = learning_points
+                    course.last_updated = datetime.now().isoformat()
+
+                    # Count total videos across all LearnPoints
+                    total_videos = sum(len(lp.videos) for lp in learning_points)
+                    videos_with_vimeo = sum(
+                        1 for lp in learning_points
+                        for v in lp.videos if v.vimeo_url
+                    )
 
                     self.stats["courses_crawled"] += 1
-                    self.stats["total_videos_found"] += len(videos)
-
-                    videos_with_vimeo = sum(1 for v in videos if v.vimeo_url)
+                    self.stats["total_videos_found"] += total_videos
                     self.stats["videos_with_vimeo"] += videos_with_vimeo
-                    self.stats["videos_without_vimeo"] += len(videos) - videos_with_vimeo
+                    self.stats["videos_without_vimeo"] += total_videos - videos_with_vimeo
 
-                    logger.info(f"✅ Successfully crawled {len(videos)} videos")
+                    logger.info(f"✅ Successfully crawled {total_videos} videos in {len(learning_points)} LearnPoints")
                     logger.info(f"   - With Vimeo URL: {videos_with_vimeo}")
-                    logger.info(f"   - Without Vimeo URL: {len(videos) - videos_with_vimeo}")
+                    logger.info(f"   - Without Vimeo URL: {total_videos - videos_with_vimeo}")
 
                     # Save immediately after each successful course
                     logger.info(f"💾 Saving progress to {self.content_file.name}...")
@@ -186,7 +196,7 @@ class CourseCrawler:
         course_title: str,
         category: Optional['Category'] = None,
         course: Optional['Course'] = None,
-    ) -> Optional[List[Video]]:
+    ) -> Optional[List[LearnPoint]]:
         """
         Crawl a single course with retry logic
 
@@ -195,10 +205,10 @@ class CourseCrawler:
             course_url: Course page URL
             course_title: Course title (for logging)
             category: Category object (for download path)
-            course: Course object (for JSON updates)
+            course: Course object (for updating overview, transcript, duration)
 
         Returns:
-            List of Video objects or None if failed
+            List of LearnPoint objects (each containing videos) or None if failed
         """
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -216,6 +226,47 @@ class CourseCrawler:
 
                 # Wait for page to settle
                 await asyncio.sleep(random.uniform(1.5, 2.5))
+
+                # Step 1: Extract course details (overview, transcript, duration)
+                logger.info("📝 Extracting course details...")
+
+                # Extract overview
+                overview_text = await self.parser.extract_overview(page)
+                if overview_text:
+                    # Save overview to file
+                    overview_path = self.parser.save_overview_to_file(
+                        overview=overview_text,
+                        language=self.language,
+                        category_or_series=category.title if category else "Unknown",
+                        course_title=course.title
+                    )
+                    if overview_path:
+                        course.overview = overview_path  # Save path, not content
+                        logger.info(f"   ✅ Overview saved to: {overview_path}")
+                    else:
+                        logger.warning("   ⚠️  Failed to save overview to file")
+
+                # Extract transcript
+                transcript_text = await self.parser.extract_transcript(page)
+                if transcript_text:
+                    # Save transcript to file
+                    transcript_path = self.parser.save_transcript_to_file(
+                        transcript=transcript_text,
+                        language=self.language,
+                        category_or_series=category.title if category else "Unknown",
+                        course_title=course.title
+                    )
+                    if transcript_path:
+                        course.transcript = transcript_path  # Save path, not content
+                        logger.info(f"   ✅ Transcript saved to: {transcript_path}")
+                    else:
+                        logger.warning("   ⚠️  Failed to save transcript to file")
+
+                # Extract duration
+                duration = await self.parser.extract_duration(page)
+                if duration > 0:
+                    course.duration = duration
+                    logger.info(f"   ✅ Duration: {duration} minutes")
 
                 # Human-like behavior: Scroll and read course page
                 if self.enable_human_behavior:
@@ -239,24 +290,33 @@ class CourseCrawler:
                         distance=random.randint(100, 200)
                     )
 
-                # Parse course page to get steps
-                steps = await self.parser.parse_course_page(page)
+                # Step 2: Extract LearnPoint structure with videos
+                logger.info("📦 Extracting LearnPoint structure...")
+                learning_points_dict = await self.parser.extract_learning_points(page)
 
-                if not steps:
-                    logger.warning(f"⚠️  No steps found (attempt {attempt})")
+                if not learning_points_dict:
+                    logger.warning(f"⚠️  No learning points found (attempt {attempt})")
                     if attempt < self.max_retries:
                         await asyncio.sleep(random.uniform(2, 4))
                         continue
                     return None
 
-                logger.info(f"📖 Found {len(steps)} steps")
+                # Count total steps across all LearnPoints
+                total_steps = sum(len(steps) for steps in learning_points_dict.values())
+                logger.info(f"📖 Found {total_steps} steps across {len(learning_points_dict)} LearnPoints")
 
                 # Now visit each step to extract Vimeo URL
-                videos = []
+                # We'll collect all steps first, then organize by LearnPoint
+                all_steps = []
+                for lp_name, lp_steps in learning_points_dict.items():
+                    for step in lp_steps:
+                        all_steps.append((lp_name, step))
 
-                for step_idx, step in enumerate(steps, 1):
+                videos_by_learn_point = {}  # Dict[str, List[Video]]
+
+                for step_idx, (learn_point_name, step) in enumerate(all_steps, 1):
                     try:
-                        logger.info(f"   🎬 Step [{step_idx}/{len(steps)}]: {step.title}")
+                        logger.info(f"   🎬 Step [{step_idx}/{total_steps}] ({learn_point_name}): {step.title}")
 
                         # Navigate to step page
                         step_full_url = f"https://unlimited.globis.co.jp{step.url}"
@@ -307,19 +367,16 @@ class CourseCrawler:
                             title=step.title,
                             url=step.url,
                             vimeo_url="",  # Will be filled after extraction
-                            downloaded=False,
-                            uploaded_to_drive=False,
-                            drive_file_id=""
+                            learning_point=learn_point_name,  # Set from LearnPoint structure
+                            downloaded=False,  # Default status
+                            download_path="",
+                            last_updated=datetime.now().isoformat()
                         )
 
-                        # Step 2: Add video to list and save to JSON immediately
-                        videos.append(video)
-
-                        # Save progress to JSON after adding video info (if course object provided)
-                        if course:
-                            course.videos = videos
-                            self.content_manager.save()
-                            logger.debug(f"      💾 Saved video info to JSON: {step.title}")
+                        # Step 2: Add video to LearnPoint group
+                        if learn_point_name not in videos_by_learn_point:
+                            videos_by_learn_point[learn_point_name] = []
+                        videos_by_learn_point[learn_point_name].append(video)
 
                         # Step 3: Extract video URLs from DOM using VimeoExtractor
                         logger.debug("      🔍 Extracting video URLs from DOM...")
@@ -334,14 +391,14 @@ class CourseCrawler:
                             logger.debug(f"      ✅ Extracted URLs - Vimeo: {vimeo_url}")
                             logger.debug(f"      ✅ Best download URL: {best_download_url[:100]}...")
 
-                            # Update video with vimeo_url
+                            # Update video with vimeo_url and timestamp
                             video.vimeo_url = vimeo_url or ""
-                            if course:
-                                self.content_manager.save()
+                            video.last_updated = datetime.now().isoformat()
                         else:
                             logger.warning("      ⚠️  Failed to extract video URLs from DOM")
 
                         # Step 4: Download video if enabled and best_download_url found
+                        # Note: Downloads are typically done in a separate phase
                         if self.enable_download and best_download_url and category and course:
                             # Get category/series name and course name
                             category_or_series = category.title
@@ -360,15 +417,13 @@ class CourseCrawler:
                             # Step 5: Update JSON with download status
                             if download_success:
                                 video.downloaded = True
+                                video.download_path = str(self.downloader.get_last_download_path())
+                                video.last_updated = datetime.now().isoformat()
                                 self.stats["videos_downloaded"] += 1
                                 logger.info(f"      ✅ Download complete & JSON updated")
                             else:
                                 self.stats["videos_download_failed"] += 1
                                 logger.error(f"      ❌ Download failed")
-
-                            # Save download status to JSON
-                            if course:
-                                self.content_manager.save()
 
                         if vimeo_url:
                             logger.info(f"      ✅ Vimeo URL: {vimeo_url}")
@@ -376,23 +431,36 @@ class CourseCrawler:
                             logger.warning(f"      ⚠️  No Vimeo URL found")
 
                         # Small delay between steps
-                        if step_idx < len(steps):
+                        if step_idx < total_steps:
                             await asyncio.sleep(random.uniform(0.8, 1.5))
 
                     except Exception as e:
                         logger.error(f"      ❌ Failed to extract Vimeo URL for step: {e}")
                         # Still add the video but without Vimeo URL
-                        videos.append(Video(
+                        error_video = Video(
                             title=step.title,
                             url=step.url,
                             vimeo_url="",
+                            learning_point=learn_point_name,
                             downloaded=False,
-                            uploaded_to_drive=False,
-                            drive_file_id=""
-                        ))
+                            download_path="",
+                            last_updated=datetime.now().isoformat()
+                        )
+                        if learn_point_name not in videos_by_learn_point:
+                            videos_by_learn_point[learn_point_name] = []
+                        videos_by_learn_point[learn_point_name].append(error_video)
                         continue
 
-                return videos
+                # Convert videos_by_learn_point dict to list of LearnPoint objects
+                learn_points = []
+                for lp_name, lp_videos in videos_by_learn_point.items():
+                    learn_point = LearnPoint(
+                        title=lp_name,
+                        videos=lp_videos
+                    )
+                    learn_points.append(learn_point)
+
+                return learn_points
 
             except Exception as e:
                 error_msg = f"Attempt {attempt} failed: {str(e)}"
