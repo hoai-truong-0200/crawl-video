@@ -17,28 +17,30 @@ class VideoDownloader:
     """
     Downloads videos using yt-dlp
 
-    Folder structure:
-    - learn-content: data/downloads/learn-content/Category Name/Course Name/video_title.mp4
-    - explore-content: data/downloads/explore-content/Series Name/Course Name/video_title.mp4
+    NEW Folder structure (TODO_NEW):
+    - downloads/{lang}/{Category}/{Course}/{LearnPoint}/{Video}.mp4
+
+    Example:
+    - downloads/en/Critical Thinking/Business Proposals/Introduction/Video1.mp4
     """
 
     def __init__(
         self,
-        download_dir: Path = Path("data/downloads"),
-        content_type: str = "learn-content",
+        download_dir: Path = Path("downloads"),
+        language: str = "en",
         cookies_from_browser: str = "chrome",
     ):
         """
         Initialize video downloader
 
         Args:
-            download_dir: Base download directory (data/downloads)
-            content_type: Type of content (learn-content or explore-content)
+            download_dir: Base download directory (downloads)
+            language: Language code (en/ja)
             cookies_from_browser: Browser to extract cookies from (chrome, firefox, etc.)
         """
         self.base_download_dir = download_dir
-        self.content_type = content_type
-        self.download_dir = download_dir / content_type
+        self.language = language
+        self.download_dir = download_dir / language
         self.cookies_from_browser = cookies_from_browser
 
         # Create download directory
@@ -73,26 +75,32 @@ class VideoDownloader:
         self,
         category_or_series: str,
         course_name: str,
+        learning_point: str,
         video_title: str,
     ) -> Path:
         """
-        Get the full path for a video file
+        Get the full path for a video file (NEW structure with LearnPoint)
 
         Args:
-            category_or_series: Category name (for learn-content) or Series name (for explore-content)
+            category_or_series: Category name or Series name
             course_name: Course name
+            learning_point: LearnPoint name (e.g., "Introduction")
             video_title: Video title
 
         Returns:
             Full path to video file
+
+        Example:
+            downloads/en/Critical Thinking/Business Proposals/Introduction/Video1.mp4
         """
         # Sanitize all parts
         category_or_series = self.sanitize_filename(category_or_series)
         course_name = self.sanitize_filename(course_name)
+        learning_point = self.sanitize_filename(learning_point)
         video_title = self.sanitize_filename(video_title)
 
-        # Build path: downloads/Category/Course/video.mp4
-        video_dir = self.download_dir / category_or_series / course_name
+        # Build path: downloads/{lang}/{Category}/{Course}/{LearnPoint}/{Video}.mp4
+        video_dir = self.download_dir / category_or_series / course_name / learning_point
         video_path = video_dir / f"{video_title}.mp4"
 
         return video_path
@@ -103,33 +111,40 @@ class VideoDownloader:
         step_url: str,
         category_or_series: str,
         course_name: str,
+        learning_point: str,
         video_title: str,
         max_retries: int = 3,
+        skip_if_exists: bool = True,
     ) -> bool:
         """
-        Download a video using yt-dlp
+        Download a video using yt-dlp (NEW with LearnPoint support)
 
         Args:
             vimeo_url: Vimeo player URL (e.g., https://player.vimeo.com/video/123456)
             step_url: GLOBIS step page URL (used as referer)
             category_or_series: Category name or Series name
             course_name: Course name
+            learning_point: LearnPoint name
             video_title: Video title
             max_retries: Maximum retry attempts
+            skip_if_exists: Skip if file already exists (default: True)
 
         Returns:
-            True if download successful, False otherwise
+            True if download successful or already downloaded, False otherwise
         """
-        video_path = self.get_video_path(category_or_series, course_name, video_title)
+        video_path = self.get_video_path(category_or_series, course_name, learning_point, video_title)
 
-        # Check if already downloaded
-        if video_path.exists():
+        # Task 22 & 24: Check if already downloaded + verification
+        if skip_if_exists and video_path.exists():
             file_size = video_path.stat().st_size
             if file_size > 0:
                 logger.info(f"      ✅ Already downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB)")
                 return True
+            else:
+                logger.warning(f"      ⚠️  File exists but empty (size: 0), re-downloading: {video_path.name}")
+                video_path.unlink()  # Delete empty file
 
-        # Create directory
+        # Task 21: Create directory structure (with LearnPoint folder)
         video_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Build referer URL
@@ -217,8 +232,10 @@ class VideoDownloader:
         download_url: str,
         category_or_series: str,
         course_name: str,
+        learning_point: str,
         video_title: str,
         max_retries: int = 3,
+        skip_if_exists: bool = True,
     ) -> bool:
         """
         Download video from extracted URL (progressive, HLS, or DASH)
@@ -230,22 +247,27 @@ class VideoDownloader:
             download_url: Direct download URL (progressive MP4, HLS m3u8, or DASH mpd)
             category_or_series: Category name or Series name
             course_name: Course name
+            learning_point: LearnPoint name
             video_title: Video title
             max_retries: Maximum retry attempts
+            skip_if_exists: Skip if file already exists
 
         Returns:
             True if download successful, False otherwise
         """
-        video_path = self.get_video_path(category_or_series, course_name, video_title)
+        video_path = self.get_video_path(category_or_series, course_name, learning_point, video_title)
 
-        # Check if already downloaded
-        if video_path.exists():
+        # Task 22 & 24: Check if already downloaded + verification
+        if skip_if_exists and video_path.exists():
             file_size = video_path.stat().st_size
             if file_size > 0:
                 logger.info(f"      ✅ Already downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB)")
                 return True
+            else:
+                logger.warning(f"      ⚠️  File exists but empty, re-downloading: {video_path.name}")
+                video_path.unlink()
 
-        # Create directory
+        # Task 21: Create directory structure (with LearnPoint folder)
         video_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Detect URL type

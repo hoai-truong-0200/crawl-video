@@ -50,3 +50,5 @@ cookies.txt
 data/chrome_profile_copy/
 
 data/samples/*
+
+tests/*

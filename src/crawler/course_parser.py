@@ -381,6 +381,8 @@ class CourseParser:
         LearnPoints are groups of videos organized by learning objectives.
         They are identified by elements with class containing '__learningPointName'
 
+        IMPORTANT: Must click "Content" tab first to show the outline structure.
+
         Args:
             page: Playwright Page object (on course page)
 
@@ -389,85 +391,135 @@ class CourseParser:
             Example: {"Introduction": [step1, step2], "Main Content": [step3, step4]}
         """
         try:
+            # STEP 1: Click "Content" tab to reveal outline structure
+            logger.info("🔘 Clicking 'Content' tab to reveal course outline...")
+            try:
+                # Find and click the "Content" button (id="outline")
+                content_button = page.locator('button[id="outline"]').first
+
+                if await content_button.count() > 0:
+                    await content_button.click()
+                    logger.info("   ✅ Clicked 'Content' tab")
+
+                    # Wait for tab panel to be visible
+                    await page.wait_for_selector('div[role="tabpanel"][id="outline"]', timeout=5000)
+                    logger.info("   ✅ Outline panel visible")
+
+                    # Small delay for content to render
+                    import asyncio
+                    await asyncio.sleep(1)
+                else:
+                    logger.warning("   ⚠️  'Content' tab button not found - trying to parse anyway")
+            except Exception as e:
+                logger.warning(f"   ⚠️  Failed to click 'Content' tab: {e} - trying to parse anyway")
+
             learning_points = {}
             current_learn_point = "Default"
 
-            # Strategy 1: Find LearnPoint headers by class pattern
-            # Look for elements with class containing '__learningPointName'
-            learn_point_selectors = [
-                '[class*="__learningPointName"]',
-                '[class*="learningPoint"]',
-                '[class*="sectionTitle"]',
-                '[class*="chapterTitle"]',
-            ]
+            # STEP 2: Parse learning points structure from the outline panel
+            # Look for div with role="tabpanel" and id="outline"
+            outline_panel = page.locator('div[role="tabpanel"][id="outline"]').first
 
-            # Get all step links
-            step_elements = await page.query_selector_all('a[href*="/learn/steps/"]')
-            logger.debug(f"Found {len(step_elements)} step elements")
+            # STEP 3: Parse learning points using the clear HTML structure
+            # Structure: <li> -> <h3 class="learningPointName"> + <ul class="lessonStepsWrapper">
+            #   Each <li class="lessonStepsItem"> contains <a> with video info
 
-            # Try to find LearnPoint structure
-            for step_element in step_elements:
+            # Find all main <li> elements that contain learning points
+            # Note: locator() returns a Locator object, not awaitable. Use .all() to get elements.
+            main_ul = outline_panel.locator('ul').first  # Main container (Locator)
+            learning_point_items = await main_ul.locator('> li').all()  # Get all direct children
+
+            logger.info(f"📦 Found {len(learning_point_items)} top-level items")
+
+            for lp_item in learning_point_items:
                 try:
-                    # Look for LearnPoint header before this step
-                    # Check parent and ancestor elements
-                    parent = await step_element.evaluate_handle('el => el.parentElement')
+                    # Try to find learning point title (h3 with class containing 'learningPointName')
+                    lp_title_element = lp_item.locator('h3[class*="learningPointName"]').first
 
-                    # Try to find LearnPoint name in parent hierarchy
-                    learn_point_name = None
+                    if await lp_title_element.count() > 0:
+                        # This is a learning point with title
+                        lp_title = await lp_title_element.inner_text()
+                        lp_title = lp_title.strip()
+                        logger.info(f"   📖 Learning Point: {lp_title}")
 
-                    for selector in learn_point_selectors:
-                        try:
-                            # Look for LearnPoint header in parent or siblings
-                            lp_element = await parent.as_element().query_selector(f'xpath=ancestor::*[1]//{selector}')
-                            if not lp_element:
-                                # Try looking in preceding siblings
-                                lp_element = await parent.as_element().query_selector(f'xpath=preceding-sibling::*[1]//{selector}')
+                        # Find the steps wrapper (ul with class containing 'lessonStepsWrapper')
+                        steps_wrapper = lp_item.locator('ul[class*="lessonStepsWrapper"]').first
 
-                            if lp_element:
-                                learn_point_name = await lp_element.inner_text()
-                                if learn_point_name and len(learn_point_name.strip()) > 0:
-                                    learn_point_name = learn_point_name.strip()
-                                    break
-                        except Exception:
-                            continue
+                        if await steps_wrapper.count() > 0:
+                            # Get all step items (li with class containing 'lessonStepsItem')
+                            step_items = await steps_wrapper.locator('li[class*="lessonStepsItem"]').all()
+                            logger.info(f"      Found {len(step_items)} videos")
 
-                    # If found a new LearnPoint name, update current
-                    if learn_point_name and learn_point_name != current_learn_point:
-                        current_learn_point = learn_point_name
-                        logger.debug(f"Found LearnPoint: {current_learn_point}")
+                            for step_item in step_items:
+                                try:
+                                    # Get the link
+                                    link = step_item.locator('a[href*="/learn/steps/"]').first
 
-                    # Extract step info
-                    url = await step_element.get_attribute('href')
-                    if not url:
-                        continue
+                                    if await link.count() > 0:
+                                        # Extract URL
+                                        url = await link.get_attribute('href')
+                                        step_id = url.split('/')[-1] if url else ""
 
-                    step_id = url.split('/')[-1] if url else ""
+                                        # Extract title (span with class containing 'styledTitle')
+                                        title_element = link.locator('span[class*="styledTitle"]').first
+                                        title = await title_element.inner_text() if await title_element.count() > 0 else ""
 
-                    # Extract title
-                    title_element = await step_element.query_selector('span[class*="styledTitle"]')
-                    title = await title_element.inner_text() if title_element else ""
+                                        # Extract duration (time element)
+                                        duration_element = link.locator('time').first
+                                        duration = await duration_element.inner_text() if await duration_element.count() > 0 else ""
 
-                    # Extract duration
-                    duration_element = await step_element.query_selector('time[class*="styledTime"]')
-                    duration = await duration_element.inner_text() if duration_element else ""
+                                        # Create StepInfo
+                                        step_info = StepInfo(
+                                            title=title.strip(),
+                                            url=url,
+                                            duration=duration.strip(),
+                                            step_id=step_id,
+                                            vimeo_url="",
+                                        )
 
-                    # Create StepInfo
-                    step_info = StepInfo(
-                        title=title.strip(),
-                        url=url,
-                        duration=duration.strip(),
-                        step_id=step_id,
-                        vimeo_url="",
-                    )
+                                        # Add to learning point
+                                        if lp_title not in learning_points:
+                                            learning_points[lp_title] = []
+                                        learning_points[lp_title].append(step_info)
 
-                    # Add to current LearnPoint
-                    if current_learn_point not in learning_points:
-                        learning_points[current_learn_point] = []
+                                        logger.debug(f"         ✓ {title} ({duration})")
 
-                    learning_points[current_learn_point].append(step_info)
+                                except Exception as e:
+                                    logger.debug(f"      ⚠️  Error parsing step item: {e}")
+                                    continue
+
+                    else:
+                        # This might be a single video or other item without learning point grouping
+                        # Try to find direct video link
+                        link = lp_item.locator('a[href*="/learn/steps/"]').first
+
+                        if await link.count() > 0:
+                            url = await link.get_attribute('href')
+                            step_id = url.split('/')[-1] if url else ""
+
+                            title_element = link.locator('span[class*="styledTitle"]').first
+                            title = await title_element.inner_text() if await title_element.count() > 0 else ""
+
+                            duration_element = link.locator('time').first
+                            duration = await duration_element.inner_text() if await duration_element.count() > 0 else ""
+
+                            step_info = StepInfo(
+                                title=title.strip(),
+                                url=url,
+                                duration=duration.strip(),
+                                step_id=step_id,
+                                vimeo_url="",
+                            )
+
+                            # Add to Default learning point
+                            if "Default" not in learning_points:
+                                learning_points["Default"] = []
+                            learning_points["Default"].append(step_info)
+
+                            logger.debug(f"   ✓ Single video: {title} ({duration})")
 
                 except Exception as e:
-                    logger.debug(f"Error processing step element: {e}")
+                    logger.debug(f"   ⚠️  Error parsing learning point item: {e}")
                     continue
 
             # Log results

@@ -18,6 +18,13 @@ class CourseInfo:
     duration: Optional[str] = None  # Format: "00:07:40"
 
 
+@dataclass
+class CategoryInfo:
+    """Category/Series information extracted from learn-content/explore-content page"""
+    title: str
+    url: str
+
+
 class CategoryParser:
     """
     Parser for GLOBIS Unlimited category pages
@@ -40,6 +47,61 @@ class CategoryParser:
         """
         self.base_url = base_url.rstrip('/')
 
+    async def click_show_more_until_all_loaded(self, page: Page, max_clicks: int = 50) -> int:
+        """
+        Click 'Show More' button repeatedly until all items are loaded
+
+        Supports both English 'Show More' and Japanese 'もっと見る' buttons.
+        The button disappears when all items are loaded.
+
+        Args:
+            page: Playwright Page object
+            max_clicks: Maximum number of clicks to prevent infinite loop
+
+        Returns:
+            Number of times the button was clicked
+        """
+        import asyncio
+
+        clicks = 0
+        logger.info("🔄 Checking for 'Show More' button...")
+
+        for i in range(max_clicks):
+            try:
+                # Try to find Show More button (English or Japanese)
+                # Common patterns: button with text "Show More" or "もっと見る"
+                show_more_button = page.locator('button:has-text("Show More"), button:has-text("もっと見る")').first
+
+                # Check if button exists and is visible
+                if await show_more_button.count() > 0:
+                    is_visible = await show_more_button.is_visible(timeout=1000)
+
+                    if is_visible:
+                        logger.info(f"   🔘 Clicking 'Show More' button (#{i+1})...")
+                        await show_more_button.click()
+                        clicks += 1
+
+                        # Wait for new content to load
+                        await asyncio.sleep(1.5)
+                    else:
+                        logger.info("   ✅ 'Show More' button not visible - all items loaded")
+                        break
+                else:
+                    logger.info("   ✅ 'Show More' button not found - all items loaded")
+                    break
+
+            except Exception as e:
+                # Button disappeared or error - assume all loaded
+                logger.debug(f"   ℹ️  Show More check error: {e}")
+                break
+
+        if clicks > 0:
+            logger.info(f"✅ Clicked 'Show More' {clicks} times")
+        else:
+            logger.info("ℹ️  No 'Show More' button found - all items already loaded")
+
+        return clicks
+
     async def parse_category_page(self, page: Page) -> List[CourseInfo]:
         """
         Parse a category page and extract all courses
@@ -58,6 +120,9 @@ class CategoryParser:
         except Exception as e:
             logger.warning(f"⚠️  Course containers not found: {e}")
             return []
+
+        # Click 'Show More' button until all courses are loaded
+        await self.click_show_more_until_all_loaded(page)
 
         # Get all course containers
         course_elements = await page.query_selector_all(self.COURSE_CONTAINER_SELECTOR)
@@ -198,6 +263,133 @@ class CategoryParser:
             filtered.append(course)
 
         return filtered
+
+    async def parse_initial_categories(self, page: Page) -> List[CategoryInfo]:
+        """
+        Parse learn-content page to extract all categories
+
+        This extracts the LIST of categories from the main learn-content page,
+        not the courses within each category.
+
+        Args:
+            page: Playwright Page object (already navigated to learn-content page)
+
+        Returns:
+            List of CategoryInfo objects with title and URL
+        """
+        logger.info("🔍 Parsing initial categories list from learn-content page...")
+
+        categories = []
+
+        try:
+            # Wait for page to load
+            await page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+            # Click 'Show More' button until all categories are loaded
+            await self.click_show_more_until_all_loaded(page)
+
+            # Try to find category links - adjust selectors based on actual HTML structure
+            # Common patterns: links containing /categories/ or /series/
+            category_links = await page.locator('a[href*="/categories/"]').all()
+
+            logger.info(f"🔍 Found {len(category_links)} category links")
+
+            for link in category_links:
+                try:
+                    # Get href and title
+                    href = await link.get_attribute('href')
+                    title = await link.inner_text()
+
+                    if not href or not title:
+                        continue
+
+                    # Make absolute URL
+                    if href.startswith('/'):
+                        url = f"{self.base_url}{href}"
+                    else:
+                        url = href
+
+                    # Clean title
+                    title = title.strip()
+
+                    # Avoid duplicates
+                    if not any(cat.url == url for cat in categories):
+                        categories.append(CategoryInfo(title=title, url=url))
+                        logger.debug(f"   ✓ {title}: {url}")
+
+                except Exception as e:
+                    logger.warning(f"   ⚠️  Failed to parse category link: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(categories)} unique categories")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to parse categories: {e}")
+
+        return categories
+
+    async def parse_initial_series(self, page: Page) -> List[CategoryInfo]:
+        """
+        Parse explore-content page to extract all series
+
+        This extracts the LIST of series from the main explore-content page,
+        not the courses within each series.
+
+        Args:
+            page: Playwright Page object (already navigated to explore-content page)
+
+        Returns:
+            List of CategoryInfo objects with title and URL (reusing CategoryInfo for series)
+        """
+        logger.info("🔍 Parsing initial series list from explore-content page...")
+
+        series_list = []
+
+        try:
+            # Wait for page to load
+            await page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+            # Click 'Show More' button until all series are loaded
+            await self.click_show_more_until_all_loaded(page)
+
+            # Try to find series links - adjust selectors based on actual HTML structure
+            series_links = await page.locator('a[href*="/series/"]').all()
+
+            logger.info(f"🔍 Found {len(series_links)} series links")
+
+            for link in series_links:
+                try:
+                    # Get href and title
+                    href = await link.get_attribute('href')
+                    title = await link.inner_text()
+
+                    if not href or not title:
+                        continue
+
+                    # Make absolute URL
+                    if href.startswith('/'):
+                        url = f"{self.base_url}{href}"
+                    else:
+                        url = href
+
+                    # Clean title
+                    title = title.strip()
+
+                    # Avoid duplicates
+                    if not any(s.url == url for s in series_list):
+                        series_list.append(CategoryInfo(title=title, url=url))
+                        logger.debug(f"   ✓ {title}: {url}")
+
+                except Exception as e:
+                    logger.warning(f"   ⚠️  Failed to parse series link: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(series_list)} unique series")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to parse series: {e}")
+
+        return series_list
 
     @staticmethod
     def _parse_duration(duration_str: str) -> Optional[int]:

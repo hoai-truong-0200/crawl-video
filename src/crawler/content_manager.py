@@ -21,19 +21,17 @@ class Video:
     Fields:
         title: Video title
         url: Video page URL (/en/courses/.../steps/123)
-        vimeo_url: Vimeo player URL (https://player.vimeo.com/video/...)
+        step_id: Step ID extracted from URL
+        duration: Video duration (e.g., "5:23")
         learning_point: LearnPoint group name
-        downloaded: Download status (default: False)
-        download_path: Local file path after download
         last_updated: ISO 8601 timestamp
     """
     title: str = ""
     url: str = ""
-    vimeo_url: str = ""
-    learning_point: str = ""  # NEW: LearnPoint group name
-    downloaded: bool = False  # NEW: Download status (default: False)
-    download_path: str = ""  # NEW: Local file path
-    last_updated: str = ""  # NEW: ISO 8601 timestamp
+    step_id: str = ""
+    duration: str = ""
+    learning_point: str = ""
+    last_updated: str = ""
 
 
 @dataclass
@@ -63,24 +61,15 @@ class Course:
     Fields:
         title: Course title
         url: Course page URL
-        overview: Path to overview.txt file (e.g., "en/Category/Course/overview.txt")
-        transcript: Path to transcript.txt file (e.g., "en/Category/Course/transcript.txt")
         duration: Total course duration in minutes
         last_updated: ISO 8601 timestamp
-        learning_points: List of LearnPoints (replaces flat videos list)
-
-    Note:
-        - overview and transcript store FILE PATHS, not content
-        - Actual text content is saved in .txt files in the course directory
-        - This keeps JSON file size manageable
+        learning_points: List of LearnPoints grouping videos by learning objectives
     """
     title: str = ""
     url: str = ""
-    overview: str = ""  # Path to overview.txt (relative to downloads/)
-    transcript: str = ""  # Path to transcript.txt (relative to downloads/)
     duration: int = 0  # Duration in minutes
     last_updated: str = ""
-    learning_points: List[LearnPoint] = field(default_factory=list)  # LearnPoint structure
+    learning_points: List[LearnPoint] = field(default_factory=list)
 
     def __post_init__(self):
         if self.learning_points is None:
@@ -126,7 +115,7 @@ class Series:
 
 
 class ContentManager:
-    """Manage learn-content.json file"""
+    """Manage learn-content.json and explore-content.json files"""
 
     def __init__(self, content_file: Path, language: str = "en"):
         """
@@ -140,6 +129,10 @@ class ContentManager:
         self.language = language
         self.root_last_updated = ""
         self.categories: List[Category] = []
+        self.series: List[Series] = []  # For explore-content.json
+
+        # Auto-detect file type
+        self.is_explore_content = "explore-content" in str(content_file)
 
         logger.info(f"📚 Content Manager initialized: {content_file} ({language})")
 
@@ -148,17 +141,35 @@ class ContentManager:
         Load content from JSON file
 
         Supports both old format (flat videos) and new format (LearnPoint structure)
+        Auto-initializes with correct structure if file is empty or invalid
         """
+        # If file doesn't exist, initialize with empty structure
         if not self.content_file.exists():
             logger.warning(f"⚠️  Content file not found: {self.content_file}")
+            logger.info(f"📝 Will create new file with empty structure on first save")
+            self.categories = []
+            return
+
+        # If file exists but is empty or too small, initialize structure
+        if self.content_file.stat().st_size < 3:  # Less than "{}" or "[]"
+            logger.warning(f"⚠️  Content file is empty: {self.content_file}")
+            logger.info(f"📝 Initializing with empty structure")
+            self._initialize_empty_file()
             return
 
         try:
             with open(self.content_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
+            # Handle empty array [] - initialize proper structure
+            if isinstance(data, list):
+                logger.warning(f"⚠️  File contains array instead of object: {self.content_file}")
+                logger.info(f"📝 Initializing with correct structure")
+                self._initialize_empty_file()
+                return
+
             # Get language and last_updated from root (if present)
-            self.language = data.get('language', 'en')
+            self.language = data.get('language', self.language)  # Use provided language as fallback
             self.root_last_updated = data.get('last_updated', '')
 
             self.categories = []
@@ -177,10 +188,9 @@ class ContentManager:
                                 videos.append(Video(
                                     title=video_data.get('title', ''),
                                     url=video_data.get('url', ''),
-                                    vimeo_url=video_data.get('vimeo_url', ''),
+                                    step_id=video_data.get('step_id', ''),
+                                    duration=video_data.get('duration', ''),
                                     learning_point=video_data.get('learning_point', ''),
-                                    downloaded=video_data.get('downloaded', False),
-                                    download_path=video_data.get('download_path', ''),
                                     last_updated=video_data.get('last_updated', '')
                                 ))
 
@@ -192,8 +202,6 @@ class ContentManager:
                         courses.append(Course(
                             title=course_data.get('title', ''),
                             url=course_data.get('url', ''),
-                            overview=course_data.get('overview', ''),
-                            transcript=course_data.get('transcript', ''),
                             duration=course_data.get('duration', 0),
                             last_updated=course_data.get('last_updated', ''),
                             learning_points=learning_points
@@ -206,10 +214,9 @@ class ContentManager:
                             videos.append(Video(
                                 title=video_data.get('title', ''),
                                 url=video_data.get('url', ''),
-                                vimeo_url=video_data.get('vimeo_url', ''),
-                                learning_point='',  # Empty for old format
-                                downloaded=video_data.get('downloaded', False),
-                                download_path='',
+                                step_id=video_data.get('step_id', ''),
+                                duration=video_data.get('duration', ''),
+                                learning_point='',
                                 last_updated=''
                             ))
 
@@ -219,8 +226,6 @@ class ContentManager:
                         courses.append(Course(
                             title=course_data.get('title', ''),
                             url=course_data.get('url', ''),
-                            overview='',
-                            transcript='',
                             duration=0,
                             last_updated=course_data.get('last_updated', ''),
                             learning_points=[default_lp] if videos else []
@@ -233,17 +238,120 @@ class ContentManager:
                     courses=courses
                 ))
 
-            logger.info(f"✅ Loaded {len(self.categories)} categories")
+            # Parse series (for explore-content.json)
+            self.series = []
+            for series_data in data.get('series', []):
+                # Parse courses (same structure as categories)
+                courses = []
+                for course_data in series_data.get('courses', []):
+                    # NEW FORMAT: Parse learning_points (if present)
+                    if 'learning_points' in course_data:
+                        learning_points = []
+                        for lp_data in course_data.get('learning_points', []):
+                            videos = []
+                            for video_data in lp_data.get('videos', []):
+                                videos.append(Video(
+                                    title=video_data.get('title', ''),
+                                    url=video_data.get('url', ''),
+                                    step_id=video_data.get('step_id', ''),
+                                    duration=video_data.get('duration', ''),
+                                    learning_point=video_data.get('learning_point', ''),
+                                    last_updated=video_data.get('last_updated', '')
+                                ))
+
+                            learning_points.append(LearnPoint(
+                                title=lp_data.get('title', ''),
+                                videos=videos
+                            ))
+
+                        courses.append(Course(
+                            title=course_data.get('title', ''),
+                            url=course_data.get('url', ''),
+                            duration=course_data.get('duration', 0),
+                            last_updated=course_data.get('last_updated', ''),
+                            learning_points=learning_points
+                        ))
+                    # OLD FORMAT: Parse flat videos list
+                    else:
+                        videos = []
+                        for video_data in course_data.get('videos', []):
+                            videos.append(Video(
+                                title=video_data.get('title', ''),
+                                url=video_data.get('url', ''),
+                                step_id=video_data.get('step_id', ''),
+                                duration=video_data.get('duration', ''),
+                                learning_point='',
+                                last_updated=''
+                            ))
+
+                        default_lp = LearnPoint(title='Default', videos=videos)
+                        courses.append(Course(
+                            title=course_data.get('title', ''),
+                            url=course_data.get('url', ''),
+                            duration=0,
+                            last_updated=course_data.get('last_updated', ''),
+                            learning_points=[default_lp] if videos else []
+                        ))
+
+                self.series.append(Series(
+                    title=series_data.get('title', ''),
+                    url=series_data.get('url', ''),
+                    last_updated=series_data.get('last_updated', ''),
+                    courses=courses
+                ))
+
+            # Log results
+            if self.categories:
+                logger.info(f"✅ Loaded {len(self.categories)} categories")
+            if self.series:
+                logger.info(f"✅ Loaded {len(self.series)} series")
 
         except Exception as e:
             logger.error(f"❌ Failed to load content: {e}")
-            raise
+            # On error, initialize with empty structure and save it
+            logger.info(f"📝 Initializing with empty structure due to load error")
+            self._initialize_empty_file()
+
+    def _initialize_empty_file(self) -> None:
+        """
+        Initialize file with correct empty structure and save it immediately
+        Auto-detects whether to create categories (learn-content) or series (explore-content)
+        """
+        self.categories = []
+        self.series = []
+        self.root_last_updated = ''
+
+        # Save the correct structure immediately
+        try:
+            self.content_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Different structure for explore-content vs learn-content
+            if self.is_explore_content:
+                data = {
+                    'series': []
+                }
+                logger.info(f"📝 Initializing explore-content structure (series)")
+            else:
+                data = {
+                    'language': self.language,
+                    'last_updated': '',
+                    'categories': []
+                }
+                logger.info(f"📝 Initializing learn-content structure (categories)")
+
+            with open(self.content_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+            logger.info(f"✅ Initialized empty structure in {self.content_file}")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize file: {e}")
 
     def save(self) -> None:
         """
         Save content to JSON file with NEW schema
 
         Includes language, last_updated, and LearnPoint structure
+        Auto-detects whether to save categories (learn-content) or series (explore-content)
         """
         try:
             # Ensure parent directory exists
@@ -253,11 +361,51 @@ class ContentManager:
             if not self.root_last_updated:
                 self.root_last_updated = datetime.now().isoformat()
 
-            # Convert to dict with NEW schema
-            data = {
-                'language': self.language,
-                'last_updated': self.root_last_updated,
-                'categories': [
+            # Different structure for explore-content vs learn-content
+            if self.is_explore_content:
+                # Save series (explore-content.json)
+                data = {
+                    'series': [
+                        {
+                            'title': series.title,
+                            'url': series.url,
+                            'last_updated': series.last_updated or datetime.now().isoformat(),
+                            'courses': [
+                                {
+                                    'title': course.title,
+                                    'url': course.url,
+                                    'duration': course.duration,
+                                    'last_updated': course.last_updated or datetime.now().isoformat(),
+                                    'learning_points': [
+                                        {
+                                            'title': lp.title,
+                                            'videos': [
+                                                {
+                                                    'title': video.title,
+                                                    'url': video.url,
+                                                    'step_id': video.step_id,
+                                                    'duration': video.duration,
+                                                    'learning_point': video.learning_point,
+                                                    'last_updated': video.last_updated or datetime.now().isoformat()
+                                                }
+                                                for video in lp.videos
+                                            ]
+                                        }
+                                        for lp in course.learning_points
+                                    ]
+                                }
+                                for course in series.courses
+                            ]
+                        }
+                        for series in self.series
+                    ]
+                }
+            else:
+                # Save categories (learn-content.json)
+                data = {
+                    'language': self.language,
+                    'last_updated': self.root_last_updated,
+                    'categories': [
                     {
                         'title': cat.title,
                         'url': cat.url,
@@ -266,8 +414,6 @@ class ContentManager:
                             {
                                 'title': course.title,
                                 'url': course.url,
-                                'overview': course.overview,
-                                'transcript': course.transcript,
                                 'duration': course.duration,
                                 'last_updated': course.last_updated or datetime.now().isoformat(),
                                 'learning_points': [
@@ -277,10 +423,9 @@ class ContentManager:
                                             {
                                                 'title': video.title,
                                                 'url': video.url,
-                                                'vimeo_url': video.vimeo_url,
+                                                'step_id': video.step_id,
+                                                'duration': video.duration,
                                                 'learning_point': video.learning_point,
-                                                'downloaded': video.downloaded,
-                                                'download_path': video.download_path,
                                                 'last_updated': video.last_updated or datetime.now().isoformat()
                                             }
                                             for video in lp.videos

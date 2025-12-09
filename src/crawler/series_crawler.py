@@ -128,6 +128,10 @@ class SeriesCrawler:
                 self.stats["total_courses_found"] += len(courses)
 
                 logger.info(f"✅ Successfully crawled {len(courses)} courses")
+
+                # 💾 Save immediately after each series
+                logger.info(f"💾 Saving progress...")
+                self.content_manager.save()
             else:
                 self.stats["series_failed"] += 1
                 logger.warning(f"⚠️  Failed to crawl series")
@@ -140,12 +144,13 @@ class SeriesCrawler:
                 logger.info(f"⏳ Waiting {delay:.1f}s before next series...")
                 await asyncio.sleep(delay)
 
-        # Save updated content using ContentManager
+        # Final save (already saved incrementally after each series)
         logger.info("\n" + "=" * 70)
-        logger.info("💾 SAVING RESULTS")
+        logger.info("💾 FINAL SAVE")
         logger.info("=" * 70)
 
         self.content_manager.save()
+        logger.info(f"✅ All results saved to {self.content_file}")
 
         # Print final statistics
         self._print_statistics()
