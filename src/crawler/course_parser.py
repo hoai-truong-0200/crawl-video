@@ -345,7 +345,9 @@ class CourseParser:
                 return total_minutes
 
             # Strategy 2: Look for total duration indicator
+            import re
             duration_selectors = [
+                'div[class*="__courseTime"] span[class*="__text"]',  # Pattern: dtSMJa__courseTime > iTGktM__text
                 'span[class*="duration"]',
                 'div[class*="totalTime"]',
                 'span:has-text("min")',
@@ -357,12 +359,29 @@ class CourseParser:
                     element = await page.query_selector(selector)
                     if element:
                         text = await element.inner_text()
-                        # Try to extract number from text like "45 min" or "45分"
-                        import re
+                        text = text.strip()
+
+                        # Format: "0h 50m" or "1h 30m"
+                        match = re.match(r'(\d+)h\s*(\d+)m', text)
+                        if match:
+                            hours = int(match.group(1))
+                            minutes = int(match.group(2))
+                            total_minutes = hours * 60 + minutes
+                            logger.debug(f"Found duration (h:m format): {total_minutes} minutes from '{text}'")
+                            return total_minutes
+
+                        # Format: "50m" or "50 min" or "50分"
+                        match = re.match(r'(\d+)\s*(?:m|min|分)', text)
+                        if match:
+                            minutes = int(match.group(1))
+                            logger.debug(f"Found duration (minutes format): {minutes} minutes from '{text}'")
+                            return minutes
+
+                        # Fallback: extract any number
                         match = re.search(r'(\d+)', text)
                         if match:
                             duration = int(match.group(1))
-                            logger.debug(f"Found duration indicator: {duration} minutes")
+                            logger.debug(f"Found duration indicator: {duration} minutes from '{text}'")
                             return duration
                 except Exception:
                     continue

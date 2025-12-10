@@ -67,12 +67,13 @@ class CategoryCrawler:
             "errors": [],
         }
 
-    async def crawl_all_categories(self, page: Page) -> Dict[str, int]:
+    async def crawl_all_categories(self, page: Page, only_empty: bool = False) -> Dict[str, int]:
         """
         Crawl all categories from learn-content.json
 
         Args:
             page: Playwright Page object (already logged in)
+            only_empty: If True, only crawl categories with empty courses list
 
         Returns:
             Statistics dictionary
@@ -88,21 +89,33 @@ class CategoryCrawler:
             logger.error("❌ No categories found in learn-content.json")
             return self.stats
 
-        logger.info(f"📚 Found {len(self.content_manager.categories)} categories to crawl")
+        # Filter categories if only_empty flag is set
+        categories_to_crawl = self.content_manager.categories
+        if only_empty:
+            categories_to_crawl = [cat for cat in self.content_manager.categories if not cat.courses]
+            logger.info(f"🎯 Only crawling categories with empty courses list")
+            logger.info(f"📚 Found {len(categories_to_crawl)} empty categories out of {len(self.content_manager.categories)} total")
+        else:
+            logger.info(f"📚 Found {len(categories_to_crawl)} categories to crawl")
+
+        if not categories_to_crawl:
+            logger.info("✅ No categories to crawl (all have courses already)")
+            return self.stats
+
         logger.info(f"⏱️  Delay between requests: {self.min_delay}-{self.max_delay}s")
         logger.info(f"🔄 Max retries per category: {self.max_retries}")
 
         # Crawl each category
-        for idx, category in enumerate(self.content_manager.categories, 1):
+        for idx, category in enumerate(categories_to_crawl, 1):
             category_title = category.title
             category_url = category.url
 
             if not category_url:
-                logger.warning(f"[{idx}/{len(self.content_manager.categories)}] ⚠️  Skipping '{category_title}' - no URL")
+                logger.warning(f"[{idx}/{len(categories_to_crawl)}] ⚠️  Skipping '{category_title}' - no URL")
                 continue
 
             logger.info("\n" + "=" * 70)
-            logger.info(f"📂 [{idx}/{len(self.content_manager.categories)}] {category_title}")
+            logger.info(f"📂 [{idx}/{len(categories_to_crawl)}] {category_title}")
             logger.info("=" * 70)
             logger.info(f"🔗 URL: {category_url}")
 

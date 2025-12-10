@@ -486,7 +486,7 @@ async def test_category_parsing(page, save_html=True):
 # STEP 4B: CRAWL ALL CATEGORIES
 # ============================================================
 
-async def crawl_all_categories(page):
+async def crawl_all_categories(page, only_empty: bool = False):
     """Crawl all categories and save courses to JSON"""
 
     logger.info("\n" + "=" * 60)
@@ -503,7 +503,7 @@ async def crawl_all_categories(page):
         )
 
         # Crawl all categories
-        stats = await crawler.crawl_all_categories(page)
+        stats = await crawler.crawl_all_categories(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -524,7 +524,7 @@ async def crawl_all_categories(page):
 # STEP 4C: CRAWL ALL SERIES
 # ============================================================
 
-async def crawl_all_series(page):
+async def crawl_all_series(page, only_empty: bool = False):
     """Crawl all series and save courses to JSON"""
 
     logger.info("\n" + "=" * 60)
@@ -541,7 +541,7 @@ async def crawl_all_series(page):
         )
 
         # Crawl all series
-        stats = await crawler.crawl_all_series(page)
+        stats = await crawler.crawl_all_series(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -562,7 +562,7 @@ async def crawl_all_series(page):
 # STEP 4D: CRAWL COURSE DETAILS (OVERVIEW, TRANSCRIPT, DURATION)
 # ============================================================
 
-async def crawl_all_courses(page, content_file=None):
+async def crawl_all_courses(page, content_file=None, only_empty: bool = False):
     """
     Crawl course details (overview, transcript, duration) from all courses
 
@@ -594,7 +594,7 @@ async def crawl_all_courses(page, content_file=None):
         )
 
         # Crawl all courses for details
-        stats = await crawler.crawl_all_courses(page)
+        stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -644,7 +644,7 @@ async def crawl_all_videos(page, content_file=None):
         )
 
         # Crawl all courses to extract videos
-        stats = await crawler.crawl_all_courses(page)
+        stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -1039,7 +1039,7 @@ async def download_all_videos(page, content_file=None):
         )
 
         # Crawl all courses and download videos
-        stats = await crawler.crawl_all_courses(page)
+        stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -1062,7 +1062,7 @@ async def download_all_videos(page, content_file=None):
 # MAIN WORKFLOW
 # ============================================================
 
-async def main(mode: str = "test", language: str = None):
+async def main(mode: str = "test", language: str = None, only_empty: bool = False):
     """
     Main workflow
 
@@ -1214,7 +1214,7 @@ async def main(mode: str = "test", language: str = None):
                     max_retries=3,
                 )
 
-                stats = await crawler.crawl_all_series(page)
+                stats = await crawler.crawl_all_series(page, only_empty=only_empty)
 
                 logger.info("\n" + "=" * 70)
                 logger.info(f"✅ SERIES CRAWLING COMPLETE ({language.upper()})")
@@ -1236,7 +1236,7 @@ async def main(mode: str = "test", language: str = None):
                         max_retries=3,
                     )
 
-                    stats = await crawler.crawl_all_series(page)
+                    stats = await crawler.crawl_all_series(page, only_empty=only_empty)
                     logger.info(f"✅ {lang.upper()} done: {target_file}")
 
                     if idx < len(languages):
@@ -1262,7 +1262,7 @@ async def main(mode: str = "test", language: str = None):
                 # Learn content
                 learn_file = sites_manager.get_content_file_path(language, "learn-content")
                 logger.info(f"\n📚 Part 1: Crawling courses from {learn_file}...")
-                await crawl_all_courses(page, learn_file)
+                await crawl_all_courses(page, learn_file, only_empty=only_empty)
 
                 logger.info("\n⏳ Waiting 10 seconds...")
                 await asyncio.sleep(10)
@@ -1270,7 +1270,7 @@ async def main(mode: str = "test", language: str = None):
                 # Explore content
                 explore_file = sites_manager.get_content_file_path(language, "explore-content")
                 logger.info(f"\n📚 Part 2: Crawling courses from {explore_file}...")
-                await crawl_all_courses(page, explore_file)
+                await crawl_all_courses(page, explore_file, only_empty=only_empty)
 
                 logger.info("\n" + "=" * 70)
                 logger.info(f"✅ COURSES CRAWLING COMPLETE ({language.upper()})")
@@ -1288,7 +1288,7 @@ async def main(mode: str = "test", language: str = None):
                     # Learn content
                     learn_file = sites_manager.get_content_file_path(lang, "learn-content")
                     logger.info(f"\n📚 Part 1: {lang.upper()} learn-content...")
-                    await crawl_all_courses(page, learn_file)
+                    await crawl_all_courses(page, learn_file, only_empty=only_empty)
 
                     logger.info("\n⏳ Waiting 10 seconds...")
                     await asyncio.sleep(10)
@@ -1296,7 +1296,7 @@ async def main(mode: str = "test", language: str = None):
                     # Explore content
                     explore_file = sites_manager.get_content_file_path(lang, "explore-content")
                     logger.info(f"\n📚 Part 2: {lang.upper()} explore-content...")
-                    await crawl_all_courses(page, explore_file)
+                    await crawl_all_courses(page, explore_file, only_empty=only_empty)
 
                     if idx < len(languages):
                         logger.info("\n⏳ Waiting 15 seconds before next language...")
@@ -1432,7 +1432,7 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 1: Crawl categories
             logger.info("\n📚 Part 1: Crawling Categories...")
-            cat_success = await crawl_all_categories(page)
+            cat_success = await crawl_all_categories(page, only_empty=only_empty)
 
             if cat_success:
                 logger.info(f"✅ Categories done: {LEARN_CONTENT_FILE}")
@@ -1445,7 +1445,7 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 2: Crawl series
             logger.info("\n🎬 Part 2: Crawling Series...")
-            series_success = await crawl_all_series(page)
+            series_success = await crawl_all_series(page, only_empty=only_empty)
 
             if series_success:
                 logger.info(f"✅ Series done: {EXPLORE_CONTENT_FILE}")
@@ -1458,7 +1458,7 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 3: Crawl course details from learn-content
             logger.info("\n📚 Part 3a: Crawling course details from learn-content...")
-            learn_courses_success = await crawl_all_courses(page, LEARN_CONTENT_FILE)
+            learn_courses_success = await crawl_all_courses(page, LEARN_CONTENT_FILE, only_empty=only_empty)
 
             if learn_courses_success:
                 logger.info(f"✅ Learn content course details done: {LEARN_CONTENT_FILE}")
@@ -1471,7 +1471,7 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 3b: Crawl course details from explore-content
             logger.info("\n📚 Part 3b: Crawling course details from explore-content...")
-            explore_courses_success = await crawl_all_courses(page, EXPLORE_CONTENT_FILE)
+            explore_courses_success = await crawl_all_courses(page, EXPLORE_CONTENT_FILE, only_empty=only_empty)
 
             if explore_courses_success:
                 logger.info(f"✅ Explore content course details done: {EXPLORE_CONTENT_FILE}")
@@ -1530,12 +1530,18 @@ if __name__ == "__main__":
     # Parse command line arguments
     mode = "test"  # Default mode
     language = None  # Default: all languages or EN
+    only_empty = False  # Default: crawl all items
 
     if len(sys.argv) > 1:
         mode = sys.argv[1].lower()
 
-    if len(sys.argv) > 2:
-        language = sys.argv[2].lower()
+    # Check for language and --only-empty flag
+    for i in range(2, len(sys.argv)):
+        arg = sys.argv[i].lower()
+        if arg == "--only-empty":
+            only_empty = True
+        elif arg in ["en", "ja"]:
+            language = arg
 
     # Validate mode
     if mode not in ["sites", "init", "test", "categories", "series", "courses", "videos", "downloads", "all"]:
@@ -1558,11 +1564,16 @@ if __name__ == "__main__":
         logger.info("  ja         - Japanese only")
         logger.info("  (none)     - All languages (for sites) or default EN (for other modes)")
         logger.info("")
+        logger.info("Flags:")
+        logger.info("  --only-empty  - Only crawl items with empty data (skip completed)")
+        logger.info("")
         logger.info("Examples:")
         logger.info("  python3 run_browser.py sites          # Parse all languages from sites.json")
         logger.info("  python3 run_browser.py sites en       # Parse English categories/series")
         logger.info("  python3 run_browser.py sites ja       # Parse Japanese categories/series")
         logger.info("  python3 run_browser.py categories en  # Crawl English category details")
+        logger.info("  python3 run_browser.py courses --only-empty      # Only crawl courses with empty learning_points")
+        logger.info("  python3 run_browser.py categories ja --only-empty  # Only crawl Japanese categories with empty courses")
         sys.exit(1)
 
-    asyncio.run(main(mode, language))
+    asyncio.run(main(mode, language, only_empty))
