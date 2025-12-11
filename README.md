@@ -1,15 +1,20 @@
-# 🎥 GLOBIS Video Crawler & Uploader
+# 🎥 GLOBIS Video Crawler
 
-Automated system to crawl video courses from GLOBIS Unlimited, download videos, and upload to Google Drive.
+Automated system to crawl video courses from GLOBIS Unlimited with advanced anti-detection and multi-language support.
 
 ## 🚀 Features
 
 - ✅ **Advanced Anti-Detection**: Stealth browser automation with human behavior simulation
-- ✅ **Smart Crawling**: Extract courses and videos metadata from multiple categories
-- ✅ **Video Download**: Automated download using yt-dlp with Vimeo support
-- ✅ **Cloud Upload**: Automatic upload to Google Drive with resumable transfers
-- ✅ **Session Management**: Resume operations from interruptions
-- ✅ **Rate Limiting**: Avoid detection with intelligent request throttling
+- ✅ **Multi-Language Support**: Crawl English (en) and Japanese (ja) courses
+- ✅ **Smart Crawling**: Hierarchical extraction (sites → categories/series → courses → content)
+- ✅ **Incremental Saving**: Auto-save after each item to prevent data loss
+- ✅ **Auto-Initialization**: JSON files auto-created with correct structure
+- ✅ **Show More Handling**: Automatically clicks "Show More" buttons to load all content
+- ✅ **Selective Crawling**: `--only-empty` flag to skip completed items
+- ✅ **Learning Points**: Extract and organize videos by learning objectives
+- ✅ **Content Extraction**: Extract overview, transcript, and AI summary to text files
+- 🚧 **Video Download**: Using yt-dlp with Vimeo support (planned)
+- 🚧 **Cloud Upload**: Google Drive integration (planned)
 
 ## 📁 Project Structure
 
@@ -18,37 +23,62 @@ crawl-video/
 ├── src/
 │   ├── browser/          # Anti-detection browser setup
 │   ├── crawler/          # Course & video metadata crawling
-│   ├── downloader/       # Video download with yt-dlp
-│   ├── uploader/         # Google Drive integration
-│   └── utils/            # Session, logging, helpers
-├── config/               # Configuration files
+│   │   ├── category_parser.py     # Parse category pages
+│   │   ├── category_crawler.py    # Crawl all categories
+│   │   ├── series_crawler.py      # Crawl all series
+│   │   ├── course_crawler.py      # Crawl course details
+│   │   ├── course_parser.py       # Parse course pages
+│   │   ├── content_extractor.py   # Extract course content (NEW!)
+│   │   └── content_manager.py     # Manage JSON files
+│   ├── downloader/       # Video download (planned)
+│   ├── uploader/         # Google Drive integration (planned)
+│   └── utils/            # Helpers and utilities
 ├── data/
 │   ├── courses/          # Course metadata JSON files
-│   ├── downloads/        # Downloaded videos
-│   ├── sessions/         # Session state files
-│   └── cache/            # Temporary cache
+│   │   ├── sites.json    # Source URLs for categories/series
+│   │   ├── en/           # English content
+│   │   │   ├── learn-content.json    # Categories and courses
+│   │   │   └── explore-content.json  # Series and courses
+│   │   └── ja/           # Japanese content
+│   │       ├── learn-content.json
+│   │       └── explore-content.json
+│   └── chrome_profile_copy/  # Chrome profile for auth
+├── downloads/            # Extracted course content
+│   ├── en/              # English content
+│   │   ├── categories/  # From learn-content
+│   │   │   └── [category_title]/
+│   │   │       └── [course_title]/
+│   │   │           ├── overview.txt
+│   │   │           ├── transcript.txt
+│   │   │           └── summary.txt (if available)
+│   │   └── series/      # From explore-content
+│   │       └── [series_title]/
+│   │           └── [course_title]/
+│   │               ├── overview.txt
+│   │               ├── transcript.txt
+│   │               └── summary.txt
+│   └── ja/              # Japanese content (same structure)
 ├── docs/                 # Documentation
 ├── logs/                 # Application logs
 ├── tests/                # Unit tests
-└── main.py              # Main entry point
+└── run_browser.py        # Main entry point
 ```
 
 ## 🛠️ Tech Stack
 
-- **Browser Automation**: Playwright + playwright-stealth
-- **Video Download**: yt-dlp + ffmpeg
-- **Cloud Storage**: Google Drive API v3
-- **HTTP Client**: httpx with HTTP/2
-- **Logging**: loguru
-- **Configuration**: pydantic + python-dotenv
+- **Browser Automation**: Playwright (async) + stealth techniques
+- **Parsing**: BeautifulSoup4 for HTML parsing
+- **Logging**: loguru for structured logging
+- **Data Management**: JSON-based with auto-initialization
+- **Video Download**: yt-dlp + ffmpeg (planned)
+- **Cloud Storage**: Google Drive API v3 (planned)
 
 ## 📦 Installation
 
 ### Prerequisites
 
 - Python 3.10+
-- ffmpeg and ffprobe
-- Google Cloud account with Drive API enabled
+- Google Chrome browser (for authentication)
 
 ### Setup
 
@@ -70,124 +100,202 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-4. **Install system dependencies**:
+4. **Prepare data directory**:
 ```bash
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
-
-# macOS
-brew install ffmpeg
-
-# Windows
-# Download from https://ffmpeg.org/download.html
+mkdir -p data/courses/{en,ja}
 ```
 
-5. **Configure environment**:
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-6. **Setup Google Drive API**:
-   - Create a Google Cloud project
-   - Enable Google Drive API
-   - Create Service Account or OAuth2 credentials
-   - Download credentials to `config/credentials.json`
+5. **Configure sites.json** (optional):
+   - Edit `data/courses/sites.json` to add/modify source URLs
+   - Default configuration provided for GLOBIS Unlimited
 
 ## 🎯 Usage
 
-### Basic Usage
+### Crawling Workflow
 
-```bash
-# Run full workflow: crawl -> download -> upload
-python main.py
+The crawler follows a hierarchical structure:
 
-# Crawl metadata only
-python main.py --crawl-only
-
-# Download videos only
-python main.py --download-only
-
-# Upload to Drive only
-python main.py --upload-only
+```
+1. sites     → Parse initial categories/series from sites.json
+2. categories → Crawl category details (course lists)
+3. series    → Crawl series details (course lists)
+4. courses   → Extract course details (duration, learning_points, videos)
+5. content   → Extract course content (overview, transcript, summary) to txt files
+6. downloads → Download videos [planned]
 ```
 
-### Advanced Options
+### Basic Commands
 
 ```bash
-# Resume from last session
-python main.py --resume
+# Parse initial categories and series from sites.json
+python3 run_browser.py sites            # All languages
+python3 run_browser.py sites en         # English only
+python3 run_browser.py sites ja         # Japanese only
 
-# Specify custom config
-python main.py --config custom_config.json
+# Crawl category details (course lists)
+python3 run_browser.py categories       # All categories
+python3 run_browser.py categories en    # English only
 
-# Enable debug logging
-python main.py --log-level DEBUG
+# Crawl series details (course lists)
+python3 run_browser.py series           # All series
+python3 run_browser.py series ja        # Japanese only
 
-# Process specific category
-python main.py --category "Marketing"
+# Crawl course details (duration + learning_points + videos)
+python3 run_browser.py courses          # All courses
+python3 run_browser.py courses en       # English only
+
+# Extract course content (overview, transcript, summary)
+python3 run_browser.py content          # All courses
+python3 run_browser.py content en       # English only
+python3 run_browser.py content ja       # Japanese only
+
+# Run full workflow
+python3 run_browser.py all              # sites → categories → series → courses → content
+```
+
+### Selective Crawling
+
+Use `--only-empty` flag to skip items that already have data:
+
+```bash
+# Only crawl categories with empty courses list
+python3 run_browser.py categories --only-empty
+
+# Only crawl courses with empty learning_points
+python3 run_browser.py courses --only-empty
+
+# Only extract content from courses without existing txt files
+python3 run_browser.py content --only-empty
+
+# Only extract Japanese content missing files
+python3 run_browser.py content ja --only-empty
+```
+
+### Examples
+
+```bash
+# Initial setup: Parse all categories and series
+python3 run_browser.py sites
+
+# Get course lists for English categories
+python3 run_browser.py categories en
+
+# Extract course details for all languages
+python3 run_browser.py courses
+
+# Extract course content (overview/transcript/summary)
+python3 run_browser.py content
+
+# Resume interrupted content extraction (skip existing)
+python3 run_browser.py content --only-empty
 ```
 
 ## ⚙️ Configuration
 
-Edit `.env` file for configuration:
+### sites.json Structure
 
-```env
-# Browser Settings
-BROWSER_HEADLESS=false
-BROWSER_TIMEOUT=45000
+Configure source URLs in `data/courses/sites.json`:
 
-# Google Drive
-GOOGLE_CREDENTIALS_PATH=config/credentials.json
-
-# Download Settings
-DOWNLOAD_PATH=data/downloads
-VIDEO_QUALITY_PREFERENCE=720p,1080p,480p
-
-# Anti-Detection
-STEALTH_MODE=true
-BEHAVIOR_SIMULATION=true
-MAX_REQUESTS_PER_MINUTE=10
+```json
+{
+  "en": {
+    "learn": "xxx",
+    "explore": "xxx"
+  },
+  "ja": {
+    "learn": "xxx",
+    "explore": "xxx"
+  }
+}
 ```
 
-See [.env.example](.env.example) for all available options.
+### Data Structure
+
+**learn-content.json** (Categories):
+```json
+{
+  "language": "en",
+  "last_updated": "2025-12-10T12:00:00",
+  "categories": [
+    {
+      "title": "Category Name",
+      "url": "https://...",
+      "last_updated": "...",
+      "courses": [
+        {
+          "title": "Course Title",
+          "url": "https://...",
+          "duration": 50,
+          "learning_points": [...]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**explore-content.json** (Series):
+```json
+{
+  "series": [
+    {
+      "title": "Series Name",
+      "url": "https://...",
+      "last_updated": "...",
+      "courses": [...]
+    }
+  ]
+}
+```
 
 ## 📖 Documentation
 
+- [Sites Option](docs/SITES_OPTION.md) - Details on sites parsing
 - [Tech Research](docs/TECH_RESEARCH.md) - Technology selection and analysis
 - [TODO List](TODO.md) - Development roadmap and progress
 
 ## 🔒 Security & Privacy
 
-- Never commit `.env` file or credentials
-- Store Google credentials securely in `config/credentials.json`
 - Use anti-detection responsibly and ethically
 - Respect website terms of service and rate limits
+- Chrome profile is copied to `data/chrome_profile_copy/` for session persistence
+- Manual login required only once per session
 
 ## 🐛 Troubleshooting
 
-### Browser Detection Issues
-- Ensure `STEALTH_MODE=true` in `.env`
-- Try using headed mode: `BROWSER_HEADLESS=false`
-- Clear browser cache in `data/cache/`
+### Browser Issues
+- If login fails, try running in headed mode (default)
+- Clear Chrome profile: `rm -rf data/chrome_profile_copy/`
+- Check browser logs in console
 
-### Download Failures
-- Check ffmpeg installation: `ffmpeg -version`
-- Verify video URL is accessible
-- Check logs in `logs/` directory
+### Crawling Issues
+- **Empty results**: Check if "Show More" button was clicked properly
+- **Duration not found**: Verify course page HTML structure matches selectors
+- **Learning points missing**: Ensure "Content" tab is being clicked
+- **Content extraction fails**: Check if tabs (Overview/Transcript) exist on page
+- **Summary not extracted**: Summary tab is optional and may not exist for all courses
+- Check logs for detailed error messages
 
-### Upload Errors
-- Verify Google credentials are valid
-- Check Drive API is enabled
-- Ensure sufficient Drive storage
+### Data Issues
+- **JSON parse errors**: Files are auto-initialized if corrupt
+- **Missing data**: Use `--only-empty` to re-crawl incomplete items
+- **Duplicate entries**: Each item has unique URL as identifier
+- **Invalid filenames**: Special characters in titles are sanitized to underscores
 
 ## 📝 Development
 
 ### Project Status
 
-See [TODO.md](TODO.md) for current development status.
-
-**Progress**: 2/25 tasks (8%)
+**Current Phase**: Content extraction complete ✅
+- ✅ Sites parsing with Show More handling
+- ✅ Categories and series crawling
+- ✅ Course details extraction (duration + learning_points)
+- ✅ Multi-language support (EN/JA)
+- ✅ Incremental saving and auto-initialization
+- ✅ Selective crawling with `--only-empty`
+- ✅ Content extraction (overview, transcript, summary) to text files
+- 🚧 Video download with yt-dlp
+- 🚧 Google Drive upload
 
 ### Running Tests
 
@@ -205,4 +313,4 @@ This tool is for educational purposes only. Ensure you have proper authorization
 
 ---
 
-**Last Updated**: 2025-11-13
+**Last Updated**: 2025-12-11
