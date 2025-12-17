@@ -291,6 +291,15 @@ class CourseCrawler:
                     )
                     learn_points.append(learn_point)
 
+                # If download enabled, download videos
+                if self.enable_download:
+                    await self._download_videos(
+                        page=page,
+                        learn_points=learn_points,
+                        category_or_series=category.title if category else "Unknown",
+                        course_title=course_title
+                    )
+
                 return learn_points
 
             except Exception as e:
@@ -338,3 +347,125 @@ class CourseCrawler:
             Statistics dictionary
         """
         return self.stats.copy()
+
+    async def _download_videos(
+        self,
+        page: Page,
+        learn_points: List[LearnPoint],
+        category_or_series: str,
+        course_title: str,
+        is_series: bool = False
+    ) -> None:
+        """
+        Download all videos in learning points
+
+        Args:
+            page: Playwright Page object
+            learn_points: List of LearnPoint objects with videos
+            category_or_series: Category or series title (for folder structure)
+            course_title: Course title (for folder structure)
+            is_series: True if from Series (explore-content), False if from Category (learn-content)
+        """
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"📥 DOWNLOADING VIDEOS FOR: {course_title}")
+        logger.info(f"{'=' * 60}")
+
+        total_videos = sum(len(lp.videos) for lp in learn_points)
+        downloaded = 0
+        skipped = 0
+        failed = 0
+
+        for lp_idx, learn_point in enumerate(learn_points, 1):
+            logger.info(f"\n📖 Learning Point {lp_idx}/{len(learn_points)}: {learn_point.title}")
+            logger.info(f"   Videos: {len(learn_point.videos)}")
+
+            for vid_idx, video in enumerate(learn_point.videos, 1):
+                try:
+                    # Check if is_downloaded attribute exists (for backward compatibility)
+                    if not hasattr(video, 'is_downloaded'):
+                        video.is_downloaded = False
+
+                    # Skip if already downloaded
+                    if video.is_downloaded:
+                        logger.info(f"   ⏭️  [{vid_idx}/{len(learn_point.videos)}] Already downloaded: {video.title}")
+                        skipped += 1
+                        continue
+
+                    logger.info(f"\n   🎬 [{vid_idx}/{len(learn_point.videos)}] Processing: {video.title}")
+
+                    # Navigate to video step page
+                    video_url = f"https://unlimited.globis.co.jp{video.url}" if not video.url.startswith("http") else video.url
+                    logger.info(f"      🌐 Navigating to: {video.url}")
+
+                    await page.goto(video_url, wait_until='domcontentloaded', timeout=60000)
+
+                    # Wait for page to load
+                    await asyncio.sleep(random.uniform(2.0, 3.0))
+
+                    # Extract video URLs using VimeoExtractor
+                    logger.info(f"      🔍 Extracting video URLs from playerConfig...")
+                    video_data = await VimeoExtractor.extract_video_urls(page, timeout=15000)
+
+                    if not video_data or not video_data.get('best_download_url'):
+                        logger.error(f"      ❌ Could not extract download URL")
+                        failed += 1
+                        continue
+
+                    download_url = video_data['best_download_url']
+                    logger.info(f"      ✅ Download URL (FULL): {download_url}")
+
+                    # Download video
+                    logger.info(f"      📥 Downloading video...")
+                    success = await self.downloader.download_from_extracted_url(
+                        download_url=download_url,
+                        category_or_series=category_or_series,
+                        course_name=course_title,
+                        learning_point=learn_point.title,
+                        video_title=video.title,
+                        max_retries=3,
+                        skip_if_exists=True,
+                        is_series=is_series
+                    )
+
+                    if success:
+                        # Mark as downloaded
+                        video.is_downloaded = True
+                        downloaded += 1
+                        logger.info(f"      ✅ Download complete!")
+
+                        # Save progress after each video
+                        logger.info(f"      💾 Saving progress to JSON...")
+                        self.content_manager.save()
+                        logger.info(f"      ✅ Progress saved! (is_downloaded = {video.is_downloaded})")
+                    else:
+                        logger.error(f"      ❌ Download failed")
+                        failed += 1
+
+                    # Delay between videos
+                    if vid_idx < len(learn_point.videos):
+                        delay = random.uniform(3.0, 6.0)
+                        logger.debug(f"      ⏳ Waiting {delay:.1f}s before next video...")
+                        await asyncio.sleep(delay)
+
+                except Exception as e:
+                    logger.error(f"      ❌ Error downloading {video.title}: {e}")
+                    failed += 1
+                    continue
+
+        # Summary
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"📊 DOWNLOAD SUMMARY FOR: {course_title}")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"✅ Downloaded: {downloaded}/{total_videos}")
+        logger.info(f"⏭️  Skipped (already downloaded): {skipped}/{total_videos}")
+        logger.info(f"❌ Failed: {failed}/{total_videos}")
+        logger.info(f"{'=' * 60}")
+
+        # Update stats
+        if not hasattr(self.stats, 'videos_downloaded'):
+            self.stats['videos_downloaded'] = 0
+        if not hasattr(self.stats, 'videos_download_failed'):
+            self.stats['videos_download_failed'] = 0
+
+        self.stats['videos_downloaded'] = self.stats.get('videos_downloaded', 0) + downloaded
+        self.stats['videos_download_failed'] = self.stats.get('videos_download_failed', 0) + failed
