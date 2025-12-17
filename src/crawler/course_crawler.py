@@ -84,12 +84,13 @@ class CourseCrawler:
             "errors": [],
         }
 
-    async def crawl_all_courses(self, page: Page) -> Dict[str, int]:
+    async def crawl_all_courses(self, page: Page, only_empty: bool = False) -> Dict[str, int]:
         """
         Crawl all courses to extract video information
 
         Args:
             page: Playwright Page object (already logged in)
+            only_empty: If True, only crawl courses with empty learning_points list
 
         Returns:
             Statistics dictionary
@@ -105,62 +106,74 @@ class CourseCrawler:
             logger.error("❌ No categories found in content file")
             return self.stats
 
-        # Count total courses
-        total_courses = sum(
-            len(cat.courses) for cat in self.content_manager.categories
-        )
+        # Build list of (category, course) tuples to crawl
+        courses_to_crawl = []
+        for category in self.content_manager.categories:
+            for course in category.courses:
+                if only_empty:
+                    # Only include courses with empty learning_points
+                    if not course.learning_points:
+                        courses_to_crawl.append((category, course))
+                else:
+                    courses_to_crawl.append((category, course))
+
+        # Count statistics
+        total_courses_all = sum(len(cat.courses) for cat in self.content_manager.categories)
 
         logger.info(f"📚 Found {len(self.content_manager.categories)} categories")
-        logger.info(f"📚 Total courses to crawl: {total_courses}")
+        if only_empty:
+            logger.info(f"🎯 Only crawling courses with empty learning_points list")
+            logger.info(f"📚 Found {len(courses_to_crawl)} empty courses out of {total_courses_all} total")
+        else:
+            logger.info(f"📚 Total courses to crawl: {len(courses_to_crawl)}")
+
+        if not courses_to_crawl:
+            logger.info("✅ No courses to crawl (all have learning_points already)")
+            return self.stats
+
         logger.info(f"⏱️  Delay between requests: {self.min_delay}-{self.max_delay}s")
         logger.info(f"🔄 Max retries per course: {self.max_retries}")
 
-        course_counter = 0
-
-        # Crawl each category
-        for cat_idx, category in enumerate(self.content_manager.categories, 1):
+        # Crawl each course
+        for course_counter, (category, course) in enumerate(courses_to_crawl, 1):
             logger.info(f"\n{'=' * 70}")
-            logger.info(f"📂 Category [{cat_idx}/{len(self.content_manager.categories)}]: {category.title}")
+            logger.info(f"📂 Category: {category.title}")
             logger.info(f"{'=' * 70}")
 
-            # Crawl each course in category
-            for course_idx, course in enumerate(category.courses, 1):
-                course_counter += 1
+            logger.info(f"\n🎓 Course [{course_counter}/{len(courses_to_crawl)}]: {course.title}")
+            logger.info(f"🔗 URL: {course.url}")
 
-                logger.info(f"\n🎓 Course [{course_counter}/{total_courses}]: {course.title}")
-                logger.info(f"🔗 URL: {course.url}")
+            # Crawl course with retry logic (returns list of LearnPoint objects)
+            learning_points = await self._crawl_course_with_retry(
+                page, course.url, course.title, category, course
+            )
 
-                # Crawl course with retry logic (returns list of LearnPoint objects)
-                learning_points = await self._crawl_course_with_retry(
-                    page, course.url, course.title, category, course
-                )
+            if learning_points:
+                # Update course with LearnPoint structure
+                course.learning_points = learning_points
+                course.last_updated = datetime.now().isoformat()
 
-                if learning_points:
-                    # Update course with LearnPoint structure
-                    course.learning_points = learning_points
-                    course.last_updated = datetime.now().isoformat()
+                # Count total videos across all LearnPoints
+                total_videos = sum(len(lp.videos) for lp in learning_points)
 
-                    # Count total videos across all LearnPoints
-                    total_videos = sum(len(lp.videos) for lp in learning_points)
+                self.stats["courses_crawled"] += 1
+                self.stats["total_videos_found"] += total_videos
 
-                    self.stats["courses_crawled"] += 1
-                    self.stats["total_videos_found"] += total_videos
+                logger.info(f"✅ Successfully crawled {total_videos} videos in {len(learning_points)} LearnPoints")
 
-                    logger.info(f"✅ Successfully crawled {total_videos} videos in {len(learning_points)} LearnPoints")
+                # Save immediately after each successful course
+                logger.info(f"💾 Saving progress to {self.content_file.name}...")
+                self.content_manager.save()
+                logger.info(f"✅ Progress saved!")
+            else:
+                self.stats["courses_failed"] += 1
+                logger.warning(f"⚠️  Failed to crawl course")
 
-                    # Save immediately after each successful course
-                    logger.info(f"💾 Saving progress to {self.content_file.name}...")
-                    self.content_manager.save()
-                    logger.info(f"✅ Progress saved!")
-                else:
-                    self.stats["courses_failed"] += 1
-                    logger.warning(f"⚠️  Failed to crawl course")
-
-                # Human-like delay before next course
-                if course_counter < total_courses:
-                    delay = random.uniform(self.min_delay, self.max_delay)
-                    logger.info(f"⏳ Waiting {delay:.1f}s before next course...")
-                    await asyncio.sleep(delay)
+            # Human-like delay before next course
+            if course_counter < len(courses_to_crawl):
+                delay = random.uniform(self.min_delay, self.max_delay)
+                logger.info(f"⏳ Waiting {delay:.1f}s before next course...")
+                await asyncio.sleep(delay)
 
         # Final save (in case last course failed)
         logger.info(f"\n{'=' * 70}")
