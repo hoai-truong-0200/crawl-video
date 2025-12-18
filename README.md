@@ -13,7 +13,8 @@ Automated system to crawl video courses from GLOBIS Unlimited with advanced anti
 - ✅ **Selective Crawling**: `--only-empty` flag to skip completed items
 - ✅ **Learning Points**: Extract and organize videos by learning objectives
 - ✅ **Content Extraction**: Extract overview, transcript, and AI summary to text files
-- 🚧 **Video Download**: Using yt-dlp with Vimeo support (planned)
+- ✅ **Video Download**: Automated Vimeo video downloads with progress tracking
+- ✅ **Human Behavior Simulation**: Natural delays, mouse movements, and video pause during downloads
 - 🚧 **Cloud Upload**: Google Drive integration (planned)
 
 ## 📁 Project Structure
@@ -28,11 +29,13 @@ crawl-video/
 │   │   ├── series_crawler.py      # Crawl all series
 │   │   ├── course_crawler.py      # Crawl course details
 │   │   ├── course_parser.py       # Parse course pages
-│   │   ├── content_extractor.py   # Extract course content (NEW!)
+│   │   ├── content_extractor.py   # Extract course content
+│   │   ├── vimeo_interceptor.py   # Intercept Vimeo download URLs
 │   │   └── content_manager.py     # Manage JSON files
+│   └── utils/            # Helpers and utilities
+│       └── file_downloader.py     # Async file downloader
 │   ├── downloader/       # Video download (planned)
 │   ├── uploader/         # Google Drive integration (planned)
-│   └── utils/            # Helpers and utilities
 ├── data/
 │   ├── courses/          # Course metadata JSON files
 │   │   ├── sites.json    # Source URLs for categories/series
@@ -43,20 +46,24 @@ crawl-video/
 │   │       ├── learn-content.json
 │   │       └── explore-content.json
 │   └── chrome_profile_copy/  # Chrome profile for auth
-├── downloads/            # Extracted course content
+├── downloads/            # Downloaded videos and extracted content
 │   ├── en/              # English content
 │   │   ├── categories/  # From learn-content
 │   │   │   └── [category_title]/
 │   │   │       └── [course_title]/
 │   │   │           ├── overview.txt
 │   │   │           ├── transcript.txt
-│   │   │           └── summary.txt (if available)
+│   │   │           ├── summary.txt (if available)
+│   │   │           └── [learning_point_title]/
+│   │   │               └── [video_title].mp4
 │   │   └── series/      # From explore-content
 │   │       └── [series_title]/
 │   │           └── [course_title]/
 │   │               ├── overview.txt
 │   │               ├── transcript.txt
-│   │               └── summary.txt
+│   │               ├── summary.txt
+│   │               └── [learning_point_title]/
+│   │                   └── [video_title].mp4
 │   └── ja/              # Japanese content (same structure)
 ├── docs/                 # Documentation
 ├── logs/                 # Application logs
@@ -155,6 +162,20 @@ python3 run_browser.py all              # sites → categories → series → co
 
 ### Selective Crawling
 
+### Crawling Workflow
+
+The crawler follows a hierarchical structure:
+
+```
+1. sites     → Parse initial categories/series from sites.json
+2. categories → Crawl category details (course lists)
+3. series    → Crawl series details (course lists)
+4. courses   → Extract course details (duration, learning_points, videos)
+5. content   → Extract course content (overview, transcript, summary) to txt files
+6. downloads → Download videos (Vimeo) to local storage
+```
+
+### Basic Commands
 Use `--only-empty` flag to skip items that already have data:
 
 ```bash
@@ -167,8 +188,46 @@ python3 run_browser.py courses --only-empty
 # Only extract content from courses without existing txt files
 python3 run_browser.py content --only-empty
 
+# Crawl course details (duration + learning_points + videos)
+python3 run_browser.py courses          # All courses
+python3 run_browser.py courses en       # English only
+
+# Extract course content (overview, transcript, summary)
+python3 run_browser.py content          # All courses
+python3 run_browser.py content en       # English only
+python3 run_browser.py content ja       # Japanese only
+
+# Download videos
+python3 run_browser.py downloads        # All videos
+python3 run_browser.py downloads en     # English only
+python3 run_browser.py downloads ja     # Japanese only
+
+# Run full workflow
+python3 run_browser.py all              # sites → categories → series → courses → content
 # Only extract Japanese content missing files
 python3 run_browser.py content ja --only-empty
+```
+
+### Examples
+
+```bash
+# Initial setup: Parse all categories and series
+python3 run_browser.py sites
+
+# Get course lists for English categories
+python3 run_browser.py categories en
+
+# Extract course details for all languages
+python3 run_browser.py courses
+
+# Only extract Japanese content missing files
+python3 run_browser.py content ja --only-empty
+
+# Only download videos not yet downloaded (is_downloaded == false)
+python3 run_browser.py downloads --only-empty
+
+# Only download missing English videos
+python3 run_browser.py downloads en --only-empty
 ```
 
 ### Examples
@@ -188,6 +247,12 @@ python3 run_browser.py content
 
 # Resume interrupted content extraction (skip existing)
 python3 run_browser.py content --only-empty
+
+# Download all videos
+python3 run_browser.py downloads
+
+# Resume interrupted downloads (skip already downloaded)
+python3 run_browser.py downloads --only-empty
 ```
 
 ## ⚙️ Configuration

@@ -25,7 +25,7 @@ class Video:
         duration: Video duration (e.g., "5:23")
         learning_point: LearnPoint group name
         last_updated: ISO 8601 timestamp
-        is_downloaded: Whether video has been downloaded (default: False)
+        is_downloaded: Whether video file has been downloaded (default: False)
     """
     title: str = ""
     url: str = ""

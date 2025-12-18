@@ -1094,49 +1094,286 @@ async def init_all_languages(page, target_language=None):
 # STEP 4G: DOWNLOAD ALL VIDEOS
 # ============================================================
 
-async def download_all_videos(page, content_file=None):
+async def download_all_videos(page, content_file=None, only_empty: bool = False):
     """
-    Download all videos from courses in learn-content.json or explore-content.json
+    Download all videos from courses
+
+    Downloads to: downloads/[lang]/[categories|series]/[category_title]/[course_title]/[learning_point_title]/[video_title].mp4
+    Updates is_downloaded flag in JSON after successful download
 
     Args:
         page: Playwright Page object
         content_file: Path to content file (defaults to LEARN_CONTENT_FILE)
+        only_empty: If True, only download videos where is_downloaded == False
 
     Returns:
         bool: True if successful, False otherwise
     """
+    from src.crawler.content_manager import ContentManager
+    from src.crawler.vimeo_interceptor import VimeoInterceptor
+    from src.utils.file_downloader import FileDownloader
+    import random
 
     if content_file is None:
         content_file = LEARN_CONTENT_FILE
 
+    # Determine language and content type from file path
+    language = "en" if "/en/" in str(content_file) else "ja"
+    content_type = "categories" if "learn-content" in str(content_file) else "series"
+
     logger.info("\n" + "=" * 60)
-    logger.info(f"📥 DOWNLOAD VIDEOS FROM ALL COURSES")
+    logger.info(f"📥 DOWNLOAD VIDEOS")
     logger.info(f"   Content file: {content_file}")
+    logger.info(f"   Language: {language}")
+    logger.info(f"   Type: {content_type}")
+    if only_empty:
+        logger.info(f"   Mode: Only download videos with is_downloaded=False")
     logger.info("=" * 60)
 
     try:
-        # Create crawler with download enabled
-        language = "en" if "en" in str(content_file) else "ja"
+        # Load content
+        content_manager = ContentManager(content_file, language=language)
+        content_manager.load()
 
-        crawler = CourseCrawler(
-            content_file=content_file,
-            language=language,
-            min_delay=2.0,
-            max_delay=4.0,
-            max_retries=3,
-            enable_download=True,  # Enable video downloading
-        )
+        # Get categories or series
+        if content_type == "categories":
+            containers = content_manager.categories
+        else:
+            containers = content_manager.series
 
-        # Crawl all courses and download videos
-        stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
+        if not containers:
+            logger.error(f"❌ No {content_type} found in {content_file}")
+            return False
+
+        # Initialize downloader and interceptor
+        downloader = FileDownloader()
+        interceptor = VimeoInterceptor(page)
+
+        # Statistics
+        total_videos = 0
+        downloaded_count = 0
+        skipped_count = 0
+        failed_count = 0
+
+        # Count total videos
+        for container in containers:
+            for course in container.courses:
+                for lp in course.learning_points:
+                    total_videos += len(lp.videos)
+
+        logger.info(f"📚 Found {len(containers)} {content_type}")
+        logger.info(f"📚 Total videos: {total_videos}")
+
+        video_counter = 0
+
+        # Download videos for each course
+        for container in containers:
+            container_title = container.title
+            logger.info(f"\n{'=' * 70}")
+            logger.info(f"📂 {content_type.title()[:-1]}: {container_title}")
+            logger.info(f"{'=' * 70}")
+
+            for course in container.courses:
+                course_title = course.title
+                logger.info(f"\n🎓 Course: {course_title}")
+
+                for lp in course.learning_points:
+                    lp_title = lp.title
+                    logger.info(f"\n📖 Learning Point: {lp_title}")
+
+                    for video in lp.videos:
+                        video_counter += 1
+                        video_title = video.title
+                        video_url = video.url
+
+                        logger.info(f"\n🎬 Video [{video_counter}/{total_videos}]: {video_title}")
+
+                        # Skip if already downloaded (only_empty mode or is_downloaded flag)
+                        if video.is_downloaded:
+                            logger.info("⏭️  Skipping (already downloaded)")
+                            skipped_count += 1
+                            continue
+
+                        # Build output path
+                        output_dir = Path("downloads") / language / content_type / container_title / course_title / lp_title
+                        output_dir.mkdir(parents=True, exist_ok=True)
+
+                        # Sanitize filename
+                        safe_filename = video_title.replace('/', '_').replace('\\', '_').replace(':', '_')
+                        output_file = output_dir / f"{safe_filename}.mp4"
+
+                        # Check if file already exists
+                        if output_file.exists():
+                            logger.info(f"⏭️  Skipping (file exists): {output_file.name}")
+                            video.is_downloaded = True
+                            skipped_count += 1
+                            continue
+
+                        # Navigate to video page
+                        try:
+                            # Convert relative URL to absolute URL
+                            if video_url.startswith('/'):
+                                base_url = "https://unlimited.globis.co.jp"
+                                video_url = base_url + video_url
+
+                            logger.info(f"🔗 URL: {video_url}")
+
+                            # Start intercepting Vimeo URLs
+                            await interceptor.start()
+                            interceptor.clear()
+
+                            # Navigate to video page
+                            await page.goto(video_url, wait_until="domcontentloaded", timeout=30000)
+
+                            # Human-like behavior: Random delay after page load
+                            page_load_delay = random.uniform(2.5, 4.0)
+                            await asyncio.sleep(page_load_delay)  # Wait for video player to load
+
+                            # Human-like behavior: Small random mouse movement
+                            try:
+                                await page.mouse.move(
+                                    random.randint(100, 500),
+                                    random.randint(100, 400)
+                                )
+                            except:
+                                pass
+
+                            # Extract download URL from window.playerConfig in iframe
+                            try:
+                                logger.debug("🔍 Extracting download URL from playerConfig...")
+
+                                # Wait for iframe to fully load
+                                await page.wait_for_selector('iframe[src*="player.vimeo.com"]', timeout=10000)
+
+                                # Additional wait for playerConfig to be available
+                                await asyncio.sleep(2)
+
+                                # Get playerConfig from iframe
+                                download_url = await page.evaluate('''
+                                    () => {
+                                        const iframe = document.querySelector('iframe[src*="player.vimeo.com"]');
+                                        if (!iframe || !iframe.contentWindow) {
+                                            return null;
+                                        }
+
+                                        const playerConfig = iframe.contentWindow.playerConfig;
+                                        if (!playerConfig || !playerConfig.request || !playerConfig.request.files) {
+                                            return null;
+                                        }
+
+                                        const files = playerConfig.request.files;
+
+                                        // Try to get progressive download URLs (direct MP4)
+                                        if (files.progressive && files.progressive.length > 0) {
+                                            // Sort by quality (highest first)
+                                            const sorted = files.progressive.sort((a, b) => {
+                                                const qualityOrder = {'2160p': 5, '1080p': 4, '720p': 3, '540p': 2, '360p': 1, '240p': 0};
+                                                return (qualityOrder[b.quality] || 0) - (qualityOrder[a.quality] || 0);
+                                            });
+                                            return sorted[0].url;
+                                        }
+
+                                        // Fallback: Try DASH streams
+                                        if (files.dash && files.dash.cdns) {
+                                            const cdns = files.dash.cdns;
+                                            const cdnKey = files.dash.default_cdn || Object.keys(cdns)[0];
+                                            if (cdns[cdnKey]) {
+                                                return cdns[cdnKey].url || cdns[cdnKey].avc_url;
+                                            }
+                                        }
+
+                                        // Fallback: Try HLS
+                                        if (files.hls && files.hls.cdns) {
+                                            const cdns = files.hls.cdns;
+                                            const cdnKey = files.hls.default_cdn || Object.keys(cdns)[0];
+                                            if (cdns[cdnKey]) {
+                                                return cdns[cdnKey].url || cdns[cdnKey].avc_url;
+                                            }
+                                        }
+
+                                        return null;
+                                    }
+                                ''')
+
+                                if download_url:
+                                    logger.debug(f"✅ Found download URL from playerConfig")
+                                else:
+                                    logger.debug("⚠️  No download URL in playerConfig, trying network interceptor...")
+                                    # Fallback to network interceptor method
+                                    download_url = interceptor.get_best_quality_url()
+
+                            except Exception as e:
+                                logger.debug(f"Error extracting playerConfig: {e}")
+                                # Fallback to network interceptor method
+                                download_url = interceptor.get_best_quality_url()
+
+                            if not download_url:
+                                logger.warning("❌ No download URL found")
+                                failed_count += 1
+                                continue
+
+                            logger.info(f"📥 Downloading from: {download_url[:80]}...")
+
+                            # Pause Vimeo video before download starts
+                            try:
+                                logger.debug("⏸️  Pausing Vimeo video...")
+                                # Use Vimeo Player API to pause video
+                                await page.evaluate('''
+                                    const iframe = document.querySelector('iframe[src*="player.vimeo.com"]');
+                                    if (iframe && iframe.contentWindow) {
+                                        iframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                                    }
+                                ''')
+                                # Human-like pause after pausing video
+                                pause_delay = random.uniform(0.5, 1.5)
+                                await asyncio.sleep(pause_delay)
+                                logger.debug("✅ Video paused")
+                            except Exception as e:
+                                logger.debug(f"Could not pause video (continuing anyway): {e}")
+
+                            # Download video
+                            success = await downloader.download(download_url, output_file)
+
+                            if success:
+                                # Update is_downloaded flag
+                                video.is_downloaded = True
+                                downloaded_count += 1
+                                logger.info(f"✅ Downloaded: {output_file}")
+
+                                # Save progress after each download
+                                content_manager.save()
+                                logger.debug("💾 Progress saved")
+                            else:
+                                failed_count += 1
+                                logger.warning(f"❌ Download failed: {video_title}")
+
+                        except Exception as e:
+                            logger.error(f"❌ Error downloading {video_title}: {e}")
+                            failed_count += 1
+                            continue
+
+                        finally:
+                            await interceptor.stop()
+
+                        # Human-like delay between videos with more variation
+                        if video_counter < total_videos:
+                            delay = random.uniform(3.0, 6.0)
+                            logger.info(f"⏳ Waiting {delay:.1f}s before next video...")
+                            await asyncio.sleep(delay)
+
+        # Final save
+        content_manager.save()
+#         # Crawl all courses and download videos
+#         stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
         logger.info("✅ VIDEO DOWNLOAD COMPLETE")
         logger.info("=" * 60)
-        logger.info(f"📊 Videos downloaded: {stats.get('videos_downloaded', 0)}")
-        logger.info(f"📊 Videos failed: {stats.get('videos_download_failed', 0)}")
-        logger.info(f"📊 Total videos found: {stats.get('total_videos_found', 0)}")
+        logger.info(f"📊 Total videos: {total_videos}")
+        logger.info(f"📊 Downloaded: {downloaded_count}")
+        logger.info(f"📊 Skipped: {skipped_count}")
+        logger.info(f"📊 Failed: {failed_count}")
 
         return True
 
@@ -1469,7 +1706,7 @@ async def main(mode: str = "test", language: str = None, only_empty: bool = Fals
                 # Learn content
                 learn_file = sites_manager.get_content_file_path(language, "learn-content")
                 logger.info(f"\n📥 Part 1: Downloading from {learn_file}...")
-                await download_all_videos(page, learn_file)
+                await download_all_videos(page, learn_file, only_empty=only_empty)
 
                 logger.info("\n⏳ Waiting 10 seconds...")
                 await asyncio.sleep(10)
@@ -1477,7 +1714,7 @@ async def main(mode: str = "test", language: str = None, only_empty: bool = Fals
                 # Explore content
                 explore_file = sites_manager.get_content_file_path(language, "explore-content")
                 logger.info(f"\n📥 Part 2: Downloading from {explore_file}...")
-                await download_all_videos(page, explore_file)
+                await download_all_videos(page, explore_file, only_empty=only_empty)
 
                 logger.info("\n" + "=" * 70)
                 logger.info(f"✅ VIDEO DOWNLOAD COMPLETE ({language.upper()})")
@@ -1495,7 +1732,7 @@ async def main(mode: str = "test", language: str = None, only_empty: bool = Fals
                     # Learn content
                     learn_file = sites_manager.get_content_file_path(lang, "learn-content")
                     logger.info(f"\n📥 Part 1: {lang.upper()} learn-content...")
-                    await download_all_videos(page, learn_file)
+                    await download_all_videos(page, learn_file, only_empty=only_empty)
 
                     logger.info("\n⏳ Waiting 10 seconds...")
                     await asyncio.sleep(10)
@@ -1503,7 +1740,7 @@ async def main(mode: str = "test", language: str = None, only_empty: bool = Fals
                     # Explore content
                     explore_file = sites_manager.get_content_file_path(lang, "explore-content")
                     logger.info(f"\n📥 Part 2: {lang.upper()} explore-content...")
-                    await download_all_videos(page, explore_file)
+                    await download_all_videos(page, explore_file, only_empty=only_empty)
 
                     if idx < len(languages):
                         logger.info("\n⏳ Waiting 15 seconds before next language...")
