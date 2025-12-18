@@ -110,28 +110,43 @@ class VimeoExtractor:
                 )
 
                 for video in sorted_videos:
+                    # Clean URL: replace \u0026 with &
+                    url = video.get('url', '').replace('\\u0026', '&')
+
                     result['progressive'].append({
                         'quality': video.get('quality', 'unknown'),
-                        'url': video.get('url', ''),
+                        'url': url,
                         'width': video.get('width', 0),
                         'height': video.get('height', 0),
                     })
 
-                # Best quality = first after sorting
-                result['best_download_url'] = sorted_videos[0].get('url', '')
+                # Best quality = first after sorting (already cleaned)
+                result['best_download_url'] = sorted_videos[0].get('url', '').replace('\\u0026', '&')
 
                 logger.debug(f"   ✅ Found {len(sorted_videos)} progressive URLs")
                 logger.debug(f"   📹 Best quality: {sorted_videos[0].get('quality')} "
                            f"({sorted_videos[0].get('width')}x{sorted_videos[0].get('height')})")
 
-            # Process HLS URL
+            # Process HLS URL - prioritize akfire_interconnect_quic CDN
             if hls_data:
-                default_cdn = hls_data.get('default_cdn', '')
-                hls_url = hls_data.get('cdns', {}).get(default_cdn, {}).get('url', '')
+                hls_cdns = hls_data.get('cdns', {})
+
+                # Try akfire_interconnect_quic first (user's preferred CDN)
+                hls_url = hls_cdns.get('akfire_interconnect_quic', {}).get('url', '')
+                cdn_name = 'akfire_interconnect_quic'
+
+                # Fallback to default CDN if akfire not available
+                if not hls_url:
+                    default_cdn = hls_data.get('default_cdn', '')
+                    hls_url = hls_cdns.get(default_cdn, {}).get('url', '')
+                    cdn_name = default_cdn
 
                 if hls_url:
+                    # Clean URL: replace \u0026 with &
+                    hls_url = hls_url.replace('\\u0026', '&')
+
                     result['hls'] = {
-                        'cdn': default_cdn,
+                        'cdn': cdn_name,
                         'url': hls_url
                     }
 
@@ -139,20 +154,32 @@ class VimeoExtractor:
                     if not result['best_download_url']:
                         result['best_download_url'] = hls_url
 
-                    logger.debug(f"   ✅ HLS URL found (CDN: {default_cdn})")
+                    logger.debug(f"   ✅ HLS URL found (CDN: {cdn_name})")
 
-            # Process DASH URL
+            # Process DASH URL - prioritize akfire_interconnect_quic CDN
             if dash_data:
-                default_cdn = dash_data.get('default_cdn', '')
-                dash_url = dash_data.get('cdns', {}).get(default_cdn, {}).get('url', '')
+                dash_cdns = dash_data.get('cdns', {})
+
+                # Try akfire_interconnect_quic first
+                dash_url = dash_cdns.get('akfire_interconnect_quic', {}).get('url', '')
+                cdn_name = 'akfire_interconnect_quic'
+
+                # Fallback to default CDN if akfire not available
+                if not dash_url:
+                    default_cdn = dash_data.get('default_cdn', '')
+                    dash_url = dash_cdns.get(default_cdn, {}).get('url', '')
+                    cdn_name = default_cdn
 
                 if dash_url:
+                    # Clean URL: replace \u0026 with &
+                    dash_url = dash_url.replace('\\u0026', '&')
+
                     result['dash'] = {
-                        'cdn': default_cdn,
+                        'cdn': cdn_name,
                         'url': dash_url
                     }
 
-                    logger.debug(f"   ✅ DASH URL found (CDN: {default_cdn})")
+                    logger.debug(f"   ✅ DASH URL found (CDN: {cdn_name})")
 
             if result['best_download_url']:
                 logger.debug(f"   ✅ Best download URL selected")

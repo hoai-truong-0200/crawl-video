@@ -1,6 +1,6 @@
-# 🎥 GLOBIS Video Crawler & Uploader
+# 🎥 GLOBIS Video Crawler
 
-Automated system to crawl video courses from GLOBIS Unlimited, download videos, and upload to Google Drive.
+Automated system to crawl video courses from GLOBIS Unlimited with advanced anti-detection and multi-language support.
 
 ## 🚀 Features
 
@@ -32,9 +32,10 @@ crawl-video/
 │   │   ├── content_extractor.py   # Extract course content
 │   │   ├── vimeo_interceptor.py   # Intercept Vimeo download URLs
 │   │   └── content_manager.py     # Manage JSON files
-│   ├── uploader/         # Google Drive integration (planned)
 │   └── utils/            # Helpers and utilities
 │       └── file_downloader.py     # Async file downloader
+│   ├── downloader/       # Video download (planned)
+│   ├── uploader/         # Google Drive integration (planned)
 ├── data/
 │   ├── courses/          # Course metadata JSON files
 │   │   ├── sites.json    # Source URLs for categories/series
@@ -67,7 +68,7 @@ crawl-video/
 ├── docs/                 # Documentation
 ├── logs/                 # Application logs
 ├── tests/                # Unit tests
-└── main.py              # Main entry point
+└── run_browser.py        # Main entry point
 ```
 
 ## 🛠️ Tech Stack
@@ -76,7 +77,7 @@ crawl-video/
 - **Parsing**: BeautifulSoup4 for HTML parsing
 - **Logging**: loguru for structured logging
 - **Data Management**: JSON-based with auto-initialization
-- **Video Download**: Vimeo network interception + aiohttp async downloads
+- **Video Download**: yt-dlp + ffmpeg (planned)
 - **Cloud Storage**: Google Drive API v3 (planned)
 
 ## 📦 Installation
@@ -84,8 +85,7 @@ crawl-video/
 ### Prerequisites
 
 - Python 3.10+
-- ffmpeg and ffprobe
-- Google Cloud account with Drive API enabled
+- Google Chrome browser (for authentication)
 
 ### Setup
 
@@ -107,31 +107,60 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-4. **Install system dependencies**:
+4. **Prepare data directory**:
 ```bash
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
-
-# macOS
-brew install ffmpeg
-
-# Windows
-# Download from https://ffmpeg.org/download.html
+mkdir -p data/courses/{en,ja}
 ```
 
-5. **Configure environment**:
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-6. **Setup Google Drive API**:
-   - Create a Google Cloud project
-   - Enable Google Drive API
-   - Create Service Account or OAuth2 credentials
-   - Download credentials to `config/credentials.json`
+5. **Configure sites.json** (optional):
+   - Edit `data/courses/sites.json` to add/modify source URLs
+   - Default configuration provided for GLOBIS Unlimited
 
 ## 🎯 Usage
+
+### Crawling Workflow
+
+The crawler follows a hierarchical structure:
+
+```
+1. sites     → Parse initial categories/series from sites.json
+2. categories → Crawl category details (course lists)
+3. series    → Crawl series details (course lists)
+4. courses   → Extract course details (duration, learning_points, videos)
+5. content   → Extract course content (overview, transcript, summary) to txt files
+6. downloads → Download videos [planned]
+```
+
+### Basic Commands
+
+```bash
+# Parse initial categories and series from sites.json
+python3 run_browser.py sites            # All languages
+python3 run_browser.py sites en         # English only
+python3 run_browser.py sites ja         # Japanese only
+
+# Crawl category details (course lists)
+python3 run_browser.py categories       # All categories
+python3 run_browser.py categories en    # English only
+
+# Crawl series details (course lists)
+python3 run_browser.py series           # All series
+python3 run_browser.py series ja        # Japanese only
+
+# Crawl course details (duration + learning_points + videos)
+python3 run_browser.py courses          # All courses
+python3 run_browser.py courses en       # English only
+
+# Extract course content (overview, transcript, summary)
+python3 run_browser.py content          # All courses
+python3 run_browser.py content en       # English only
+python3 run_browser.py content ja       # Japanese only
+
+# Run full workflow
+python3 run_browser.py all              # sites → categories → series → courses → content
+```
+
+### Selective Crawling
 
 ### Crawling Workflow
 
@@ -147,16 +176,17 @@ The crawler follows a hierarchical structure:
 ```
 
 ### Basic Commands
+Use `--only-empty` flag to skip items that already have data:
 
 ```bash
-# Run full workflow: crawl -> download -> upload
-python main.py
+# Only crawl categories with empty courses list
+python3 run_browser.py categories --only-empty
 
-# Crawl metadata only
-python main.py --crawl-only
+# Only crawl courses with empty learning_points
+python3 run_browser.py courses --only-empty
 
-# Download videos only
-python main.py --download-only
+# Only extract content from courses without existing txt files
+python3 run_browser.py content --only-empty
 
 # Crawl course details (duration + learning_points + videos)
 python3 run_browser.py courses          # All courses
@@ -174,19 +204,21 @@ python3 run_browser.py downloads ja     # Japanese only
 
 # Run full workflow
 python3 run_browser.py all              # sites → categories → series → courses → content
+# Only extract Japanese content missing files
+python3 run_browser.py content ja --only-empty
 ```
 
-### Advanced Options
+### Examples
 
 ```bash
-# Resume from last session
-python main.py --resume
+# Initial setup: Parse all categories and series
+python3 run_browser.py sites
 
-# Specify custom config
-python main.py --config custom_config.json
+# Get course lists for English categories
+python3 run_browser.py categories en
 
-# Enable debug logging
-python main.py --log-level DEBUG
+# Extract course details for all languages
+python3 run_browser.py courses
 
 # Only extract Japanese content missing files
 python3 run_browser.py content ja --only-empty
@@ -225,61 +257,89 @@ python3 run_browser.py downloads --only-empty
 
 ## ⚙️ Configuration
 
-Edit `.env` file for configuration:
+### sites.json Structure
 
-```env
-# Browser Settings
-BROWSER_HEADLESS=false
-BROWSER_TIMEOUT=45000
+Configure source URLs in `data/courses/sites.json`:
 
-# Google Drive
-GOOGLE_CREDENTIALS_PATH=config/credentials.json
-
-# Download Settings
-DOWNLOAD_PATH=data/downloads
-VIDEO_QUALITY_PREFERENCE=720p,1080p,480p
-
-# Anti-Detection
-STEALTH_MODE=true
-BEHAVIOR_SIMULATION=true
-MAX_REQUESTS_PER_MINUTE=10
+```json
+{
+  "en": {
+    "learn": "xxx",
+    "explore": "xxx"
+  },
+  "ja": {
+    "learn": "xxx",
+    "explore": "xxx"
+  }
+}
 ```
 
-See [.env.example](.env.example) for all available options.
+### Data Structure
+
+**learn-content.json** (Categories):
+```json
+{
+  "language": "en",
+  "last_updated": "2025-12-10T12:00:00",
+  "categories": [
+    {
+      "title": "Category Name",
+      "url": "https://...",
+      "last_updated": "...",
+      "courses": [
+        {
+          "title": "Course Title",
+          "url": "https://...",
+          "duration": 50,
+          "learning_points": [...]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**explore-content.json** (Series):
+```json
+{
+  "series": [
+    {
+      "title": "Series Name",
+      "url": "https://...",
+      "last_updated": "...",
+      "courses": [...]
+    }
+  ]
+}
+```
 
 ## 📖 Documentation
 
+- [Sites Option](docs/SITES_OPTION.md) - Details on sites parsing
 - [Tech Research](docs/TECH_RESEARCH.md) - Technology selection and analysis
 - [TODO List](TODO.md) - Development roadmap and progress
 
 ## 🔒 Security & Privacy
 
-- Never commit `.env` file or credentials
-- Store Google credentials securely in `config/credentials.json`
 - Use anti-detection responsibly and ethically
 - Respect website terms of service and rate limits
+- Chrome profile is copied to `data/chrome_profile_copy/` for session persistence
+- Manual login required only once per session
 
 ## 🐛 Troubleshooting
 
-### Browser Detection Issues
-- Ensure `STEALTH_MODE=true` in `.env`
-- Try using headed mode: `BROWSER_HEADLESS=false`
-- Clear browser cache in `data/cache/`
+### Browser Issues
+- If login fails, try running in headed mode (default)
+- Clear Chrome profile: `rm -rf data/chrome_profile_copy/`
+- Check browser logs in console
 
-### Download Failures
-- Check ffmpeg installation: `ffmpeg -version`
-- Verify video URL is accessible
-- Check logs in `logs/` directory
-
-### Download Issues
-- **No download URL found**: Vimeo interceptor may not have captured the URL
-  - Increase wait time after page load (currently 4-6 seconds)
-  - Check if video player loaded properly
-- **Download timeout**: Large video files may exceed timeout (default: 300s)
-  - Modify timeout parameter in FileDownloader if needed
-- **Video already downloaded**: Check `is_downloaded` flag in JSON or file existence
-  - Use `--only-empty` to skip already downloaded videos
-- **Progress not showing**: Progress logs appear at INFO level every 10%
+### Crawling Issues
+- **Empty results**: Check if "Show More" button was clicked properly
+- **Duration not found**: Verify course page HTML structure matches selectors
+- **Learning points missing**: Ensure "Content" tab is being clicked
+- **Content extraction fails**: Check if tabs (Overview/Transcript) exist on page
+- **Summary not extracted**: Summary tab is optional and may not exist for all courses
+- Check logs for detailed error messages
 
 ### Data Issues
 - **JSON parse errors**: Files are auto-initialized if corrupt
@@ -291,7 +351,7 @@ See [.env.example](.env.example) for all available options.
 
 ### Project Status
 
-**Current Phase**: Video download complete ✅
+**Current Phase**: Content extraction complete ✅
 - ✅ Sites parsing with Show More handling
 - ✅ Categories and series crawling
 - ✅ Course details extraction (duration + learning_points)
@@ -299,9 +359,7 @@ See [.env.example](.env.example) for all available options.
 - ✅ Incremental saving and auto-initialization
 - ✅ Selective crawling with `--only-empty`
 - ✅ Content extraction (overview, transcript, summary) to text files
-- ✅ Video download with Vimeo network interception
-- ✅ Human behavior simulation (delays, mouse movements, video pause)
-- ✅ Download progress tracking with percentage display
+- 🚧 Video download with yt-dlp
 - 🚧 Google Drive upload
 
 ### Running Tests
@@ -320,45 +378,4 @@ This tool is for educational purposes only. Ensure you have proper authorization
 
 ---
 
-**Last Updated**: 2025-12-12
-
-## 📋 Recent Updates
-
-### Version 1.0 - Video Download Feature (2025-12-12)
-
-**New Features:**
-- ✅ **Video Download Command**: New `downloads` option to download Vimeo videos
-  - Navigate to each video step URL
-  - Intercept Vimeo progressive download URLs (best quality: 1080p → 720p → 540p → 360p)
-  - Download videos with async HTTP requests
-  - Save to: `downloads/[lang]/[categories|series]/[category]/[course]/[learning_point]/[video].mp4`
-
-- ✅ **Download Tracking**: `is_downloaded` flag in JSON data
-  - Automatically set to `true` after successful download
-  - Skip already downloaded videos with `--only-empty` flag
-  - Check file existence to prevent re-downloads
-
-- ✅ **Progress Display**: Real-time download progress
-  - Show percentage at INFO level every 10%
-  - Format: `📥 Progress: 50.3% (5,234,567/10,469,134 bytes)`
-  - Final confirmation with file size
-
-- ✅ **Human Behavior Simulation**: Anti-detection enhancements
-  - Random page load delays (2.5-4.0 seconds)
-  - Random mouse movements after page load
-  - Random network wait times (4.0-6.0 seconds)
-  - Pause Vimeo video before download starts (Vimeo Player API)
-  - Random delay after pausing (0.5-1.5 seconds)
-  - Random delays between videos (3.0-6.0 seconds)
-
-- ✅ **Robust Downloads**: Retry logic and error handling
-  - 3 retry attempts with exponential backoff
-  - Timeout: 300 seconds (5 minutes) per video
-  - Graceful error handling with statistics tracking
-  - Incremental JSON saves after each successful download
-
-**Technical Implementation:**
-- `VimeoInterceptor`: Network response monitoring for progressive URLs
-- `FileDownloader`: Async file downloads with aiohttp
-- Video pause via Vimeo Player postMessage API
-- Organized folder structure by learning points
+**Last Updated**: 2025-12-11

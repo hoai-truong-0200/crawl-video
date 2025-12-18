@@ -77,6 +77,7 @@ class VideoDownloader:
         course_name: str,
         learning_point: str,
         video_title: str,
+        is_series: bool = False,
     ) -> Path:
         """
         Get the full path for a video file (NEW structure with LearnPoint)
@@ -86,12 +87,14 @@ class VideoDownloader:
             course_name: Course name
             learning_point: LearnPoint name (e.g., "Introduction")
             video_title: Video title
+            is_series: True if from Series (explore-content), False if from Category (learn-content)
 
         Returns:
             Full path to video file
 
         Example:
-            downloads/en/Critical Thinking/Business Proposals/Introduction/Video1.mp4
+            downloads/en/categories/Critical Thinking/Business Proposals/Introduction/Video1.mp4
+            downloads/en/series/Finance Series/Corporate Finance/Introduction/Video1.mp4
         """
         # Sanitize all parts
         category_or_series = self.sanitize_filename(category_or_series)
@@ -99,8 +102,9 @@ class VideoDownloader:
         learning_point = self.sanitize_filename(learning_point)
         video_title = self.sanitize_filename(video_title)
 
-        # Build path: downloads/{lang}/{Category}/{Course}/{LearnPoint}/{Video}.mp4
-        video_dir = self.download_dir / category_or_series / course_name / learning_point
+        # Build path: downloads/{lang}/{categories|series}/{Category}/{Course}/{LearnPoint}/{Video}.mp4
+        content_type = "series" if is_series else "categories"
+        video_dir = self.download_dir / content_type / category_or_series / course_name / learning_point
         video_path = video_dir / f"{video_title}.mp4"
 
         return video_path
@@ -236,6 +240,7 @@ class VideoDownloader:
         video_title: str,
         max_retries: int = 3,
         skip_if_exists: bool = True,
+        is_series: bool = False,
     ) -> bool:
         """
         Download video from extracted URL (progressive, HLS, or DASH)
@@ -251,11 +256,12 @@ class VideoDownloader:
             video_title: Video title
             max_retries: Maximum retry attempts
             skip_if_exists: Skip if file already exists
+            is_series: True if from Series (explore-content), False if from Category (learn-content)
 
         Returns:
             True if download successful, False otherwise
         """
-        video_path = self.get_video_path(category_or_series, course_name, learning_point, video_title)
+        video_path = self.get_video_path(category_or_series, course_name, learning_point, video_title, is_series)
 
         # Task 22 & 24: Check if already downloaded + verification
         if skip_if_exists and video_path.exists():
@@ -281,7 +287,8 @@ class VideoDownloader:
                 if is_progressive:
                     # Download progressive MP4 directly with aiohttp
                     logger.info(f"      📥 Downloading (progressive): {video_title}")
-                    logger.debug(f"         Attempt {attempt}/{max_retries}")
+                    logger.info(f"         Attempt {attempt}/{max_retries}")
+                    logger.info(f"         Download URL: {download_url}")
 
                     temp_path = video_path.with_suffix('.mp4.part')
 
@@ -289,12 +296,21 @@ class VideoDownloader:
                         async with session.get(download_url) as resp:
                             if resp.status == 200:
                                 total_size = int(resp.headers.get('content-length', 0))
+                                logger.info(f"         File size: {total_size / 1024 / 1024:.1f} MB")
 
                                 with open(temp_path, 'wb') as f:
                                     downloaded = 0
+                                    last_progress = 0
                                     async for chunk in resp.content.iter_chunked(1024 * 1024):
                                         f.write(chunk)
                                         downloaded += len(chunk)
+
+                                        # Show progress every 10%
+                                        if total_size > 0:
+                                            current_progress = (downloaded / total_size) * 100
+                                            if current_progress - last_progress >= 10 or current_progress >= 99:
+                                                logger.info(f"         📊 Progress: {current_progress:.1f}% ({downloaded / 1024 / 1024:.1f}/{total_size / 1024 / 1024:.1f} MB)")
+                                                last_progress = current_progress
 
                                 # Rename to final path
                                 if temp_path.exists() and temp_path.stat().st_size > 0:
@@ -318,7 +334,8 @@ class VideoDownloader:
                 elif is_hls or is_dash:
                     # Download HLS/DASH with yt-dlp
                     logger.info(f"      📥 Downloading (HLS/DASH): {video_title}")
-                    logger.debug(f"         Attempt {attempt}/{max_retries}")
+                    logger.info(f"         Attempt {attempt}/{max_retries}")
+                    logger.info(f"         Download URL: {download_url}")
 
                     temp_path = video_path.with_suffix('.mp4.part')
 
@@ -327,27 +344,106 @@ class VideoDownloader:
                         download_url,
                         '-o', str(temp_path),
                         '--no-playlist',
-                        '--quiet',
-                        '--progress',
+                        '--newline',  # Print progress on new lines for better logging
+                        '--verbose',  # Show detailed error messages
                     ]
 
+                    logger.info(f"         Running: yt-dlp {download_url[:80]}...")
+
+                    # Run with real-time output
                     process = await asyncio.create_subprocess_exec(
                         *cmd,
                         stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,  # Merge stderr into stdout
                     )
 
-                    stdout, stderr = await process.communicate()
+                    # Read output line by line for progress
+                    last_progress = 0
+                    all_output = []
+                    while True:
+                        line = await process.stdout.readline()
+                        if not line:
+                            break
 
-                    if process.returncode == 0 and temp_path.exists():
-                        # Rename to final path
-                        temp_path.rename(video_path)
-                        file_size = video_path.stat().st_size
-                        logger.info(f"      ✅ Downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB)")
-                        return True
+                        line_str = line.decode().strip()
+                        all_output.append(line_str)
+
+                        # Parse progress from yt-dlp output
+                        if '[download]' in line_str and '%' in line_str:
+                            # Extract percentage
+                            try:
+                                import re
+                                match = re.search(r'(\d+\.?\d*)%', line_str)
+                                if match:
+                                    current_progress = float(match.group(1))
+                                    # Only log every 10% to avoid spam
+                                    if current_progress - last_progress >= 10 or current_progress >= 99:
+                                        logger.info(f"         📊 Progress: {current_progress:.1f}%")
+                                        last_progress = current_progress
+                            except:
+                                pass
+
+                        # Log only actual errors (not debug messages with "error" keyword)
+                        if line_str.startswith('[error]') or line_str.startswith('ERROR:'):
+                            logger.error(f"         ❌ {line_str}")
+                        elif line_str.startswith('[warning]') or line_str.startswith('WARNING:'):
+                            logger.warning(f"         ⚠️  {line_str}")
+                        elif '[debug]' in line_str:
+                            logger.debug(f"         🔍 {line_str}")
+
+                    await process.wait()
+
+                    logger.info(f"         yt-dlp exit code: {process.returncode}")
+
+                    # Check if file was created (may have different extension)
+                    temp_dir = temp_path.parent
+                    if temp_dir.exists():
+                        logger.info(f"         Checking for downloaded files in: {temp_dir}")
+                        created_files = list(temp_dir.glob(f"{temp_path.stem}*"))
+                        logger.info(f"         Found files: {[f.name for f in created_files]}")
+
+                    if process.returncode == 0:
+                        # Check for temp file (may be .mp4.part.mp4, .mp4.part, or just .mp4)
+                        # yt-dlp often adds .mp4 extension even when we specify .mp4.part
+                        possible_paths = [
+                            temp_path.with_suffix('.part.mp4'),  # .mp4.part.mp4 (yt-dlp adds .mp4)
+                            temp_path,  # .mp4.part (as specified)
+                            video_path,  # .mp4 (yt-dlp may skip .part extension entirely)
+                            temp_path.with_suffix(''),  # no extension
+                        ]
+
+                        downloaded_file = None
+                        for possible_path in possible_paths:
+                            if possible_path.exists() and possible_path.stat().st_size > 0:
+                                downloaded_file = possible_path
+                                logger.info(f"         Found downloaded file: {possible_path.name}")
+                                break
+
+                        if downloaded_file:
+                            # Rename to final path if needed
+                            if downloaded_file != video_path:
+                                if video_path.exists():
+                                    video_path.unlink()
+                                downloaded_file.rename(video_path)
+
+                            file_size = video_path.stat().st_size
+                            logger.info(f"      ✅ Downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB)")
+                            return True
+                        else:
+                            logger.error(f"      ❌ Download succeeded but file not found")
+                            logger.error(f"         Expected: {temp_path}")
+                            logger.error(f"         yt-dlp output (last 20 lines):")
+                            for line in all_output[-20:]:
+                                logger.error(f"           {line}")
+                            if attempt < max_retries:
+                                await asyncio.sleep(2 ** attempt)
+                                continue
+                            return False
                     else:
-                        error_msg = stderr.decode().strip() if stderr else "Unknown error"
-                        logger.error(f"      ❌ yt-dlp error: {error_msg[:100]}")
+                        logger.error(f"      ❌ yt-dlp failed with return code: {process.returncode}")
+                        logger.error(f"         Full output:")
+                        for line in all_output:
+                            logger.error(f"           {line}")
                         if attempt < max_retries:
                             await asyncio.sleep(2 ** attempt)
                             continue

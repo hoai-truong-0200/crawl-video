@@ -30,9 +30,9 @@ AVAILABLE MODES:
 │             │ - Groups videos by learning objectives                        │
 │             │ - Saves incrementally after each course                       │
 ├─────────────┼──────────────────────────────────────────────────────────────┤
-│ videos      │ Extract video details (overview + transcript)                │
-│             │ - For each video in all courses                               │
-│             │ - NOT YET IMPLEMENTED                                         │
+│ content     │ Extract course content (overview + transcript + summary)     │
+│             │ - Saves to downloads/[lang]/[categories|series]/[title]/     │
+│             │ - overview.txt, transcript.txt, summary.txt (if available)   │
 ├─────────────┼──────────────────────────────────────────────────────────────┤
 │ downloads   │ Download videos using vimeo_url from courses                 │
 │             │ - NOT YET IMPLEMENTED                                         │
@@ -57,7 +57,9 @@ USAGE:
     python3 run_browser.py courses en       # Crawl English courses only
     python3 run_browser.py courses ja       # Crawl Japanese courses only
 
-    python3 run_browser.py videos           # Extract video details (NOT IMPLEMENTED)
+    python3 run_browser.py content          # Extract course content (all languages)
+    python3 run_browser.py content en       # Extract English course content
+    python3 run_browser.py content ja       # Extract Japanese course content
     python3 run_browser.py downloads        # Download videos (NOT IMPLEMENTED)
     python3 run_browser.py all              # Full workflow
 
@@ -486,7 +488,7 @@ async def test_category_parsing(page, save_html=True):
 # STEP 4B: CRAWL ALL CATEGORIES
 # ============================================================
 
-async def crawl_all_categories(page):
+async def crawl_all_categories(page, only_empty: bool = False):
     """Crawl all categories and save courses to JSON"""
 
     logger.info("\n" + "=" * 60)
@@ -503,7 +505,7 @@ async def crawl_all_categories(page):
         )
 
         # Crawl all categories
-        stats = await crawler.crawl_all_categories(page)
+        stats = await crawler.crawl_all_categories(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -524,7 +526,7 @@ async def crawl_all_categories(page):
 # STEP 4C: CRAWL ALL SERIES
 # ============================================================
 
-async def crawl_all_series(page):
+async def crawl_all_series(page, only_empty: bool = False):
     """Crawl all series and save courses to JSON"""
 
     logger.info("\n" + "=" * 60)
@@ -541,7 +543,7 @@ async def crawl_all_series(page):
         )
 
         # Crawl all series
-        stats = await crawler.crawl_all_series(page)
+        stats = await crawler.crawl_all_series(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -562,7 +564,7 @@ async def crawl_all_series(page):
 # STEP 4D: CRAWL COURSE DETAILS (OVERVIEW, TRANSCRIPT, DURATION)
 # ============================================================
 
-async def crawl_all_courses(page, content_file=None):
+async def crawl_all_courses(page, content_file=None, only_empty: bool = False):
     """
     Crawl course details (overview, transcript, duration) from all courses
 
@@ -594,7 +596,7 @@ async def crawl_all_courses(page, content_file=None):
         )
 
         # Crawl all courses for details
-        stats = await crawler.crawl_all_courses(page)
+        stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -617,45 +619,132 @@ async def crawl_all_courses(page, content_file=None):
 # STEP 4E: CRAWL VIDEOS FROM ALL COURSES
 # ============================================================
 
-async def crawl_all_videos(page, content_file=None):
+async def extract_all_content(page, content_file=None, only_empty: bool = False):
     """
-    Crawl videos from all courses in learn-content.json or explore-content.json
+    Extract course content (overview, transcript, summary) from all courses
+
+    Saves to: downloads/[lang]/[categories|series]/[category_title]/[course_title]/
+        - overview.txt
+        - transcript.txt
+        - summary.txt (if available)
 
     Args:
         page: Playwright Page object
         content_file: Path to content file (defaults to LEARN_CONTENT_FILE)
+        only_empty: If True, only extract from courses without existing content files
     """
+    from src.crawler.content_extractor import ContentExtractor
+    from src.crawler.content_manager import ContentManager
+    import random
 
     if content_file is None:
         content_file = LEARN_CONTENT_FILE
 
+    # Determine language and content type from file path
+    language = "en" if "/en/" in str(content_file) else "ja"
+    content_type = "categories" if "learn-content" in str(content_file) else "series"
+
     logger.info("\n" + "=" * 60)
-    logger.info(f"🎬 CRAWL VIDEOS FROM ALL COURSES")
+    logger.info(f"📄 EXTRACT COURSE CONTENT")
     logger.info(f"   Content file: {content_file}")
+    logger.info(f"   Language: {language}")
+    logger.info(f"   Type: {content_type}")
     logger.info("=" * 60)
 
     try:
-        # Create crawler
-        crawler = CourseCrawler(
-            content_file=content_file,
-            min_delay=1.5,
-            max_delay=3.0,
-            max_retries=3,
-        )
+        # Load content
+        content_manager = ContentManager(content_file, language=language)
+        content_manager.load()
 
-        # Crawl all courses to extract videos
-        stats = await crawler.crawl_all_courses(page)
+        # Get categories or series
+        if content_type == "categories":
+            containers = content_manager.categories
+        else:
+            containers = content_manager.series
+
+        if not containers:
+            logger.error(f"❌ No {content_type} found in {content_file}")
+            return False
+
+        # Create extractor
+        extractor = ContentExtractor()
+
+        # Count total courses
+        total_courses = sum(len(container.courses) for container in containers)
+        logger.info(f"📚 Found {len(containers)} {content_type}")
+        logger.info(f"📚 Total courses: {total_courses}")
+
+        course_counter = 0
+        extracted_count = 0
+        skipped_count = 0
+        failed_count = 0
+
+        # Extract content for each course
+        for container in containers:
+            container_title = container.title
+            logger.info(f"\n{'=' * 70}")
+            logger.info(f"📂 {content_type.title()[:-1]}: {container_title}")
+            logger.info(f"{'=' * 70}")
+
+            for course in container.courses:
+                course_counter += 1
+                course_title = course.title
+                course_url = course.url
+
+                logger.info(f"\n🎓 Course [{course_counter}/{total_courses}]: {course_title}")
+                logger.info(f"🔗 URL: {course_url}")
+
+                # Check if should skip (only_empty mode)
+                if only_empty:
+                    output_dir = extractor._get_output_dir(
+                        language, content_type, container_title, course_title
+                    )
+                    if (output_dir / "overview.txt").exists() and (output_dir / "transcript.txt").exists():
+                        logger.info("⏭️  Skipping (content already exists)")
+                        skipped_count += 1
+                        continue
+
+                # Navigate to course page
+                try:
+                    await page.goto(course_url, wait_until="domcontentloaded", timeout=30000)
+                    await asyncio.sleep(2)
+                except Exception as e:
+                    logger.error(f"❌ Failed to navigate: {e}")
+                    failed_count += 1
+                    continue
+
+                # Extract and save content
+                results = await extractor.extract_and_save(
+                    page, language, content_type, container_title, course_title
+                )
+
+                if results["overview"] or results["transcript"]:
+                    extracted_count += 1
+                    logger.info(f"✅ Extracted: overview={results['overview']}, "
+                              f"transcript={results['transcript']}, summary={results['summary']}")
+                else:
+                    failed_count += 1
+                    logger.warning("⚠️  Failed to extract content")
+
+                # Human-like delay
+                if course_counter < total_courses:
+                    delay = random.uniform(1.5, 3.0)
+                    logger.info(f"⏳ Waiting {delay:.1f}s before next course...")
+                    await asyncio.sleep(delay)
 
         # Show summary
         logger.info("\n" + "=" * 60)
-        logger.info("✅ VIDEO CRAWLING COMPLETE")
+        logger.info("✅ CONTENT EXTRACTION COMPLETE")
         logger.info("=" * 60)
-        logger.info(f"📊 Results saved to: {content_file}")
+        logger.info(f"📊 Total courses: {total_courses}")
+        logger.info(f"📊 Extracted: {extracted_count}")
+        logger.info(f"📊 Skipped: {skipped_count}")
+        logger.info(f"📊 Failed: {failed_count}")
 
         return True
 
     except Exception as e:
-        logger.error(f"❌ Video crawler error: {e}")
+        logger.error(f"❌ Content extraction error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -1274,6 +1363,8 @@ async def download_all_videos(page, content_file=None, only_empty: bool = False)
 
         # Final save
         content_manager.save()
+#         # Crawl all courses and download videos
+#         stats = await crawler.crawl_all_courses(page, only_empty=only_empty)
 
         # Show summary
         logger.info("\n" + "=" * 60)
@@ -1297,12 +1388,12 @@ async def download_all_videos(page, content_file=None, only_empty: bool = False)
 # MAIN WORKFLOW
 # ============================================================
 
-async def main(mode: str = "test", language: str = None):
+async def main(mode: str = "test", language: str = None, only_empty: bool = False):
     """
     Main workflow
 
     Args:
-        mode: "init", "test", "categories", "series", "courses", "videos", "downloads", or "all"
+        mode: "init", "test", "categories", "series", "courses", "content", "downloads", or "all"
         language: Target language (e.g., "en", "ja"). If None, uses default or all languages.
     """
 
@@ -1449,7 +1540,7 @@ async def main(mode: str = "test", language: str = None):
                     max_retries=3,
                 )
 
-                stats = await crawler.crawl_all_series(page)
+                stats = await crawler.crawl_all_series(page, only_empty=only_empty)
 
                 logger.info("\n" + "=" * 70)
                 logger.info(f"✅ SERIES CRAWLING COMPLETE ({language.upper()})")
@@ -1471,7 +1562,7 @@ async def main(mode: str = "test", language: str = None):
                         max_retries=3,
                     )
 
-                    stats = await crawler.crawl_all_series(page)
+                    stats = await crawler.crawl_all_series(page, only_empty=only_empty)
                     logger.info(f"✅ {lang.upper()} done: {target_file}")
 
                     if idx < len(languages):
@@ -1497,7 +1588,7 @@ async def main(mode: str = "test", language: str = None):
                 # Learn content
                 learn_file = sites_manager.get_content_file_path(language, "learn-content")
                 logger.info(f"\n📚 Part 1: Crawling courses from {learn_file}...")
-                await crawl_all_courses(page, learn_file)
+                await crawl_all_courses(page, learn_file, only_empty=only_empty)
 
                 logger.info("\n⏳ Waiting 10 seconds...")
                 await asyncio.sleep(10)
@@ -1505,7 +1596,7 @@ async def main(mode: str = "test", language: str = None):
                 # Explore content
                 explore_file = sites_manager.get_content_file_path(language, "explore-content")
                 logger.info(f"\n📚 Part 2: Crawling courses from {explore_file}...")
-                await crawl_all_courses(page, explore_file)
+                await crawl_all_courses(page, explore_file, only_empty=only_empty)
 
                 logger.info("\n" + "=" * 70)
                 logger.info(f"✅ COURSES CRAWLING COMPLETE ({language.upper()})")
@@ -1523,7 +1614,7 @@ async def main(mode: str = "test", language: str = None):
                     # Learn content
                     learn_file = sites_manager.get_content_file_path(lang, "learn-content")
                     logger.info(f"\n📚 Part 1: {lang.upper()} learn-content...")
-                    await crawl_all_courses(page, learn_file)
+                    await crawl_all_courses(page, learn_file, only_empty=only_empty)
 
                     logger.info("\n⏳ Waiting 10 seconds...")
                     await asyncio.sleep(10)
@@ -1531,7 +1622,7 @@ async def main(mode: str = "test", language: str = None):
                     # Explore content
                     explore_file = sites_manager.get_content_file_path(lang, "explore-content")
                     logger.info(f"\n📚 Part 2: {lang.upper()} explore-content...")
-                    await crawl_all_courses(page, explore_file)
+                    await crawl_all_courses(page, explore_file, only_empty=only_empty)
 
                     if idx < len(languages):
                         logger.info("\n⏳ Waiting 15 seconds before next language...")
@@ -1544,7 +1635,7 @@ async def main(mode: str = "test", language: str = None):
             # Close browser
             logger.info("\n👋 Closing browser...")
 
-        elif mode == "videos":
+        elif mode == "content":
             # Determine which language(s) to crawl
             sites_manager = SitesManager()
 
@@ -1556,7 +1647,7 @@ async def main(mode: str = "test", language: str = None):
                 # Learn content
                 learn_file = sites_manager.get_content_file_path(language, "learn-content")
                 logger.info(f"\n📚 Part 1: Crawling videos from {learn_file}...")
-                await crawl_all_videos(page, learn_file)
+                await extract_all_content(page, learn_file, only_empty=only_empty)
 
                 logger.info("\n⏳ Waiting 10 seconds...")
                 await asyncio.sleep(10)
@@ -1564,7 +1655,7 @@ async def main(mode: str = "test", language: str = None):
                 # Explore content
                 explore_file = sites_manager.get_content_file_path(language, "explore-content")
                 logger.info(f"\n🎬 Part 2: Crawling videos from {explore_file}...")
-                await crawl_all_videos(page, explore_file)
+                await extract_all_content(page, explore_file, only_empty=only_empty)
 
                 logger.info("\n" + "=" * 70)
                 logger.info(f"✅ VIDEOS CRAWLING COMPLETE ({language.upper()})")
@@ -1582,7 +1673,7 @@ async def main(mode: str = "test", language: str = None):
                     # Learn content
                     learn_file = sites_manager.get_content_file_path(lang, "learn-content")
                     logger.info(f"\n📚 Part 1: {lang.upper()} learn-content videos...")
-                    await crawl_all_videos(page, learn_file)
+                    await extract_all_content(page, learn_file, only_empty=only_empty)
 
                     logger.info("\n⏳ Waiting 10 seconds...")
                     await asyncio.sleep(10)
@@ -1590,7 +1681,7 @@ async def main(mode: str = "test", language: str = None):
                     # Explore content
                     explore_file = sites_manager.get_content_file_path(lang, "explore-content")
                     logger.info(f"\n🎬 Part 2: {lang.upper()} explore-content videos...")
-                    await crawl_all_videos(page, explore_file)
+                    await extract_all_content(page, explore_file, only_empty=only_empty)
 
                     if idx < len(languages):
                         logger.info("\n⏳ Waiting 15 seconds before next language...")
@@ -1663,11 +1754,11 @@ async def main(mode: str = "test", language: str = None):
             logger.info("\n👋 Closing browser...")
 
         elif mode == "all":
-            logger.info("\n🚀 STEP 4: Crawl Everything (Categories + Series + Courses + Videos)")
+            logger.info("\n🚀 STEP 4: Crawl Everything (Categories + Series + Courses + Content)")
 
             # Part 1: Crawl categories
             logger.info("\n📚 Part 1: Crawling Categories...")
-            cat_success = await crawl_all_categories(page)
+            cat_success = await crawl_all_categories(page, only_empty=only_empty)
 
             if cat_success:
                 logger.info(f"✅ Categories done: {LEARN_CONTENT_FILE}")
@@ -1680,7 +1771,7 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 2: Crawl series
             logger.info("\n🎬 Part 2: Crawling Series...")
-            series_success = await crawl_all_series(page)
+            series_success = await crawl_all_series(page, only_empty=only_empty)
 
             if series_success:
                 logger.info(f"✅ Series done: {EXPLORE_CONTENT_FILE}")
@@ -1693,7 +1784,7 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 3: Crawl course details from learn-content
             logger.info("\n📚 Part 3a: Crawling course details from learn-content...")
-            learn_courses_success = await crawl_all_courses(page, LEARN_CONTENT_FILE)
+            learn_courses_success = await crawl_all_courses(page, LEARN_CONTENT_FILE, only_empty=only_empty)
 
             if learn_courses_success:
                 logger.info(f"✅ Learn content course details done: {LEARN_CONTENT_FILE}")
@@ -1706,38 +1797,38 @@ async def main(mode: str = "test", language: str = None):
 
             # Part 3b: Crawl course details from explore-content
             logger.info("\n📚 Part 3b: Crawling course details from explore-content...")
-            explore_courses_success = await crawl_all_courses(page, EXPLORE_CONTENT_FILE)
+            explore_courses_success = await crawl_all_courses(page, EXPLORE_CONTENT_FILE, only_empty=only_empty)
 
             if explore_courses_success:
                 logger.info(f"✅ Explore content course details done: {EXPLORE_CONTENT_FILE}")
             else:
                 logger.error("❌ Explore content course crawling failed")
 
-            # Wait before video crawling
-            logger.info("\n⏳ Waiting 10 seconds before video crawling...")
+            # Wait before content extraction
+            logger.info("\n⏳ Waiting 10 seconds before content extraction...")
             await asyncio.sleep(10)
 
-            # Part 4a: Crawl videos from learn-content
-            logger.info("\n📹 Part 4a: Crawling videos from learn-content...")
-            learn_videos_success = await crawl_all_videos(page, LEARN_CONTENT_FILE)
+            # Part 4a: Extract content from learn-content
+            logger.info("\n📄 Part 4a: Extracting content from learn-content...")
+            learn_content_success = await extract_all_content(page, LEARN_CONTENT_FILE, only_empty=only_empty)
 
-            if learn_videos_success:
-                logger.info(f"✅ Learn content videos done: {LEARN_CONTENT_FILE}")
+            if learn_content_success:
+                logger.info(f"✅ Learn content extraction done")
             else:
-                logger.error("❌ Learn content video crawling failed")
+                logger.error("❌ Learn content extraction failed")
 
-            # Wait between video crawls
+            # Wait between content extractions
             logger.info("\n⏳ Waiting 10 seconds...")
             await asyncio.sleep(10)
 
-            # Part 4b: Crawl videos from explore-content
-            logger.info("\n📹 Part 4b: Crawling videos from explore-content...")
-            explore_videos_success = await crawl_all_videos(page, EXPLORE_CONTENT_FILE)
+            # Part 4b: Extract content from explore-content
+            logger.info("\n📄 Part 4b: Extracting content from explore-content...")
+            explore_content_success = await extract_all_content(page, EXPLORE_CONTENT_FILE, only_empty=only_empty)
 
-            if explore_videos_success:
-                logger.info(f"✅ Explore content videos done: {EXPLORE_CONTENT_FILE}")
+            if explore_content_success:
+                logger.info(f"✅ Explore content extraction done")
             else:
-                logger.error("❌ Explore content video crawling failed")
+                logger.error("❌ Explore content extraction failed")
 
             # Final summary
             logger.info("\n" + "=" * 70)
@@ -1745,14 +1836,14 @@ async def main(mode: str = "test", language: str = None):
             logger.info("=" * 70)
             logger.info(f"📊 Categories: {LEARN_CONTENT_FILE}")
             logger.info(f"📊 Series: {EXPLORE_CONTENT_FILE}")
-            logger.info(f"📊 Videos: Both files updated with video information")
+            logger.info(f"📊 Content: Extracted to downloads/ directory")
 
             # Close browser
             logger.info("\n👋 Closing browser...")
 
         else:
             logger.error(f"❌ Invalid mode: {mode}")
-            logger.info("Valid modes: 'test', 'categories', 'series', 'courses', 'videos', 'downloads', 'all'")
+            logger.info("Valid modes: 'test', 'categories', 'series', 'courses', 'content', 'downloads', 'all'")
 
     finally:
         # Cleanup
@@ -1765,15 +1856,21 @@ if __name__ == "__main__":
     # Parse command line arguments
     mode = "test"  # Default mode
     language = None  # Default: all languages or EN
+    only_empty = False  # Default: crawl all items
 
     if len(sys.argv) > 1:
         mode = sys.argv[1].lower()
 
-    if len(sys.argv) > 2:
-        language = sys.argv[2].lower()
+    # Check for language and --only-empty flag
+    for i in range(2, len(sys.argv)):
+        arg = sys.argv[i].lower()
+        if arg == "--only-empty":
+            only_empty = True
+        elif arg in ["en", "ja"]:
+            language = arg
 
     # Validate mode
-    if mode not in ["sites", "init", "test", "categories", "series", "courses", "videos", "downloads", "all"]:
+    if mode not in ["sites", "init", "test", "categories", "series", "courses", "content", "downloads", "all"]:
         logger.error(f"❌ Invalid mode: {mode}")
         logger.info("Usage: python3 run_browser.py [mode] [language]")
         logger.info("")
@@ -1784,20 +1881,25 @@ if __name__ == "__main__":
         logger.info("  categories - Crawl all categories (learn-content)")
         logger.info("  series     - Crawl all series (explore-content)")
         logger.info("  courses    - Crawl course details (overview, transcript, duration)")
-        logger.info("  videos     - Crawl videos from all courses")
+        logger.info("  content    - Extract course content (overview/transcript/summary) to txt files")
         logger.info("  downloads  - Download all videos (Phase 4)")
-        logger.info("  all        - Crawl categories + series + courses + videos")
+        logger.info("  all        - Crawl categories + series + courses + content")
         logger.info("")
         logger.info("Language (optional):")
         logger.info("  en         - English only")
         logger.info("  ja         - Japanese only")
         logger.info("  (none)     - All languages (for sites) or default EN (for other modes)")
         logger.info("")
+        logger.info("Flags:")
+        logger.info("  --only-empty  - Only crawl items with empty data (skip completed)")
+        logger.info("")
         logger.info("Examples:")
         logger.info("  python3 run_browser.py sites          # Parse all languages from sites.json")
         logger.info("  python3 run_browser.py sites en       # Parse English categories/series")
         logger.info("  python3 run_browser.py sites ja       # Parse Japanese categories/series")
         logger.info("  python3 run_browser.py categories en  # Crawl English category details")
+        logger.info("  python3 run_browser.py courses --only-empty      # Only crawl courses with empty learning_points")
+        logger.info("  python3 run_browser.py categories ja --only-empty  # Only crawl Japanese categories with empty courses")
         sys.exit(1)
 
-    asyncio.run(main(mode, language))
+    asyncio.run(main(mode, language, only_empty))

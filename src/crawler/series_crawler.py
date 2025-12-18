@@ -63,12 +63,13 @@ class SeriesCrawler:
             "errors": [],
         }
 
-    async def crawl_all_series(self, page: Page) -> Dict[str, int]:
+    async def crawl_all_series(self, page: Page, only_empty: bool = False) -> Dict[str, int]:
         """
         Crawl all series from explore-content.json
 
         Args:
             page: Playwright Page object (already logged in)
+            only_empty: If True, only crawl series with empty courses list
 
         Returns:
             Statistics dictionary
@@ -84,21 +85,33 @@ class SeriesCrawler:
             logger.error("❌ No series found in explore-content.json")
             return self.stats
 
-        logger.info(f"📚 Found {len(self.content_manager.series)} series to crawl")
+        # Filter series if only_empty flag is set
+        series_to_crawl = self.content_manager.series
+        if only_empty:
+            series_to_crawl = [s for s in self.content_manager.series if not s.courses]
+            logger.info(f"🎯 Only crawling series with empty courses list")
+            logger.info(f"📚 Found {len(series_to_crawl)} empty series out of {len(self.content_manager.series)} total")
+        else:
+            logger.info(f"📚 Found {len(series_to_crawl)} series to crawl")
+
+        if not series_to_crawl:
+            logger.info("✅ No series to crawl (all have courses already)")
+            return self.stats
+
         logger.info(f"⏱️  Delay between requests: {self.min_delay}-{self.max_delay}s")
         logger.info(f"🔄 Max retries per series: {self.max_retries}")
 
         # Crawl each series
-        for idx, series in enumerate(self.content_manager.series, 1):
+        for idx, series in enumerate(series_to_crawl, 1):
             series_title = series.title
             series_url = series.url
 
             if not series_url:
-                logger.warning(f"[{idx}/{len(self.content_manager.series)}] ⚠️  Skipping '{series_title}' - no URL")
+                logger.warning(f"[{idx}/{len(series_to_crawl)}] ⚠️  Skipping '{series_title}' - no URL")
                 continue
 
             logger.info("\n" + "=" * 70)
-            logger.info(f"🎬 [{idx}/{len(self.content_manager.series)}] {series_title}")
+            logger.info(f"🎬 [{idx}/{len(series_to_crawl)}] {series_title}")
             logger.info("=" * 70)
             logger.info(f"🔗 URL: {series_url}")
 
