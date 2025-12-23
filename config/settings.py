@@ -18,7 +18,6 @@ class VimeoCrawlerSettings(BaseSettings):
     PAGE_TIMEOUT: int = 20000
     BROWSER_ARGS: List[str] = [
         "--no-sandbox",
-        "--disable-blink-features=AutomationControlled",
         "--disable-web-security",
         "--enable-webgl",
         "--use-gl=swiftshader",

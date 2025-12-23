@@ -15,6 +15,7 @@ from loguru import logger
 
 from .category_parser import CategoryParser, CourseInfo
 from .content_manager import ContentManager, Series, Course
+from .category_crawler import parse_duration_to_minutes, is_recently_updated
 
 
 class SeriesCrawler:
@@ -110,6 +111,15 @@ class SeriesCrawler:
                 logger.warning(f"[{idx}/{len(series_to_crawl)}] ⚠️  Skipping '{series_title}' - no URL")
                 continue
 
+            # Skip if recently updated AND has courses data
+            # If recently updated but no courses, still crawl (data might be missing)
+            if is_recently_updated(series.last_updated, days=14) and len(series.courses) > 0:
+                logger.info(f"[{idx}/{len(self.content_manager.series)}] ⏭️  Skipping '{series_title}' - recently updated ({series.last_updated}) with {len(series.courses)} courses")
+                self.stats["series_skipped"] = self.stats.get("series_skipped", 0) + 1
+                continue
+            elif is_recently_updated(series.last_updated, days=14) and len(series.courses) == 0:
+                logger.info(f"[{idx}/{len(self.content_manager.series)}] 🔄 Crawling '{series_title}' - recently updated but no courses data")
+
             logger.info("\n" + "=" * 70)
             logger.info(f"🎬 [{idx}/{len(series_to_crawl)}] {series_title}")
             logger.info("=" * 70)
@@ -122,16 +132,21 @@ class SeriesCrawler:
                 # Convert CourseInfo to Course objects with new schema
                 course_objects = []
                 for course_info in courses:
+                    # Parse duration from string (HH:MM:SS) to minutes
+                    duration_minutes = parse_duration_to_minutes(course_info.duration)
+
                     course_obj = Course(
                         title=course_info.title,
                         url=course_info.url,
-                        overview="",  # Will be set when crawling course details
-                        transcript="",  # Will be set when crawling course details
-                        duration=0,  # Will be set when crawling course details
+                        duration=duration_minutes,
                         last_updated=datetime.now().isoformat(),
                         learning_points=[]  # Will be filled when crawling videos
                     )
                     course_objects.append(course_obj)
+
+                    # Log duration for debugging
+                    if course_info.duration:
+                        logger.debug(f"  Duration: {course_info.duration} -> {duration_minutes} min")
 
                 # Update series courses and last_updated timestamp
                 series.courses = course_objects

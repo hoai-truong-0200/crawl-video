@@ -17,6 +17,78 @@ from .category_parser import CategoryParser, CourseInfo
 from .content_manager import ContentManager, Category, Course
 
 
+def parse_duration_to_minutes(duration_str: Optional[str]) -> int:
+    """
+    Convert duration string to minutes (decimal)
+
+    Args:
+        duration_str: Duration in format "HH:MM:SS" or "MM:SS"
+
+    Returns:
+        Duration in minutes (rounded to nearest int)
+
+    Examples:
+        "00:07:40" -> 8 minutes
+        "01:30:00" -> 90 minutes
+        "45:30" -> 46 minutes
+    """
+    if not duration_str:
+        return 0
+
+    try:
+        parts = duration_str.strip().split(':')
+
+        if len(parts) == 3:
+            # HH:MM:SS format
+            hours, minutes, seconds = map(int, parts)
+            total_minutes = hours * 60 + minutes + seconds / 60
+        elif len(parts) == 2:
+            # MM:SS format
+            minutes, seconds = map(int, parts)
+            total_minutes = minutes + seconds / 60
+        else:
+            logger.warning(f"Invalid duration format: {duration_str}")
+            return 0
+
+        return round(total_minutes)
+
+    except Exception as e:
+        logger.warning(f"Error parsing duration '{duration_str}': {e}")
+        return 0
+
+
+def is_recently_updated(last_updated_str: Optional[str], days: int = 14) -> bool:
+    """
+    Check if last_updated timestamp is within the last N days
+
+    Args:
+        last_updated_str: ISO 8601 timestamp string
+        days: Number of days to consider as "recent" (default: 14 days / 2 weeks)
+
+    Returns:
+        True if recently updated (skip crawling), False otherwise (need to crawl)
+
+    Examples:
+        "2025-12-20T10:00:00" (today) -> True (skip)
+        "2025-12-10T10:00:00" (10 days ago) -> True (skip)
+        "2025-12-01T10:00:00" (19 days ago) -> False (crawl)
+        "" (empty) -> False (crawl)
+    """
+    if not last_updated_str:
+        return False
+
+    try:
+        last_updated = datetime.fromisoformat(last_updated_str)
+        now = datetime.now()
+        delta = now - last_updated
+
+        return delta.days < days
+
+    except Exception as e:
+        logger.debug(f"Error parsing last_updated '{last_updated_str}': {e}")
+        return False
+
+
 class CategoryCrawler:
     """
     Crawler for GLOBIS Unlimited category pages
@@ -114,6 +186,15 @@ class CategoryCrawler:
                 logger.warning(f"[{idx}/{len(categories_to_crawl)}] ⚠️  Skipping '{category_title}' - no URL")
                 continue
 
+            # Skip if recently updated AND has courses data
+            # If recently updated but no courses, still crawl (data might be missing)
+            if is_recently_updated(category.last_updated, days=14) and len(category.courses) > 0:
+                logger.info(f"[{idx}/{len(self.content_manager.categories)}] ⏭️  Skipping '{category_title}' - recently updated ({category.last_updated}) with {len(category.courses)} courses")
+                self.stats["categories_skipped"] = self.stats.get("categories_skipped", 0) + 1
+                continue
+            elif is_recently_updated(category.last_updated, days=14) and len(category.courses) == 0:
+                logger.info(f"[{idx}/{len(self.content_manager.categories)}] 🔄 Crawling '{category_title}' - recently updated but no courses data")
+
             logger.info("\n" + "=" * 70)
             logger.info(f"📂 [{idx}/{len(categories_to_crawl)}] {category_title}")
             logger.info("=" * 70)
@@ -126,16 +207,21 @@ class CategoryCrawler:
                 # Convert CourseInfo to Course objects with new schema
                 course_objects = []
                 for course_info in courses:
+                    # Parse duration from string (HH:MM:SS) to minutes
+                    duration_minutes = parse_duration_to_minutes(course_info.duration)
+
                     course_obj = Course(
                         title=course_info.title,
                         url=course_info.url,
-                        overview="",  # Will be set when crawling course details
-                        transcript="",  # Will be set when crawling course details
-                        duration=0,  # Will be set when crawling course details
+                        duration=duration_minutes,
                         last_updated=datetime.now().isoformat(),
                         learning_points=[]  # Will be filled when crawling videos
                     )
                     course_objects.append(course_obj)
+
+                    # Log duration for debugging
+                    if course_info.duration:
+                        logger.debug(f"  Duration: {course_info.duration} -> {duration_minutes} min")
 
                 # Update category courses and last_updated timestamp
                 category.courses = course_objects

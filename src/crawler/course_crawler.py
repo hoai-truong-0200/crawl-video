@@ -15,6 +15,7 @@ from loguru import logger
 
 from .course_parser import CourseParser, StepInfo
 from .content_manager import ContentManager, Video, LearnPoint
+from .category_crawler import is_recently_updated
 from ..browser.human_behavior import HumanBehaviorSimulator
 from ..downloader import VideoDownloader, VimeoExtractor
 
@@ -102,78 +103,81 @@ class CourseCrawler:
         # Load content
         self.content_manager.load()
 
-        if not self.content_manager.categories:
-            logger.error("❌ No categories found in content file")
+        # Support both categories (learn-content.json) and series (explore-content.json)
+        items = self.content_manager.categories if self.content_manager.categories else self.content_manager.series
+        item_type = "categories" if self.content_manager.categories else "series"
+
+        if not items:
+            logger.error(f"❌ No {item_type} found in content file")
             return self.stats
 
-        # Build list of (category, course) tuples to crawl
-        courses_to_crawl = []
-        for category in self.content_manager.categories:
-            for course in category.courses:
-                if only_empty:
-                    # Only include courses with empty learning_points
-                    if not course.learning_points:
-                        courses_to_crawl.append((category, course))
-                else:
-                    courses_to_crawl.append((category, course))
+        # Count total courses
+        total_courses = sum(
+            len(item.courses) for item in items
+        )
 
-        # Count statistics
-        total_courses_all = sum(len(cat.courses) for cat in self.content_manager.categories)
-
-        logger.info(f"📚 Found {len(self.content_manager.categories)} categories")
-        if only_empty:
-            logger.info(f"🎯 Only crawling courses with empty learning_points list")
-            logger.info(f"📚 Found {len(courses_to_crawl)} empty courses out of {total_courses_all} total")
-        else:
-            logger.info(f"📚 Total courses to crawl: {len(courses_to_crawl)}")
-
-        if not courses_to_crawl:
-            logger.info("✅ No courses to crawl (all have learning_points already)")
-            return self.stats
-
+        logger.info(f"📚 Found {len(items)} {item_type}")
+        logger.info(f"📚 Total courses to crawl: {total_courses}")
         logger.info(f"⏱️  Delay between requests: {self.min_delay}-{self.max_delay}s")
         logger.info(f"🔄 Max retries per course: {self.max_retries}")
 
-        # Crawl each course
-        for course_counter, (category, course) in enumerate(courses_to_crawl, 1):
+        course_counter = 0
+
+        # Crawl each category/series
+        for item_idx, item in enumerate(items, 1):
+            icon = "📂" if item_type == "categories" else "🎬"
             logger.info(f"\n{'=' * 70}")
-            logger.info(f"📂 Category: {category.title}")
+            logger.info(f"{icon} {item_type.capitalize()[:-1]} [{item_idx}/{len(items)}]: {item.title}")
             logger.info(f"{'=' * 70}")
 
-            logger.info(f"\n🎓 Course [{course_counter}/{len(courses_to_crawl)}]: {course.title}")
-            logger.info(f"🔗 URL: {course.url}")
+            # Crawl each course in category/series
+            for course_idx, course in enumerate(item.courses, 1):
+                course_counter += 1
 
-            # Crawl course with retry logic (returns list of LearnPoint objects)
-            learning_points = await self._crawl_course_with_retry(
-                page, course.url, course.title, category, course
-            )
+                logger.info(f"\n🎓 Course [{course_counter}/{total_courses}]: {course.title}")
+                logger.info(f"🔗 URL: {course.url}")
 
-            if learning_points:
-                # Update course with LearnPoint structure
-                course.learning_points = learning_points
-                course.last_updated = datetime.now().isoformat()
+                # Skip if recently updated AND has learning_points data
+                # If recently updated but no learning_points, still crawl (data might be missing)
+                if is_recently_updated(course.last_updated, days=14) and len(course.learning_points) > 0:
+                    total_videos = sum(len(lp.videos) for lp in course.learning_points)
+                    logger.info(f"⏭️  Skipping - recently updated ({course.last_updated}) with {len(course.learning_points)} learning points ({total_videos} videos)")
+                    self.stats["courses_skipped"] = self.stats.get("courses_skipped", 0) + 1
+                    continue
+                elif is_recently_updated(course.last_updated, days=14) and len(course.learning_points) == 0:
+                    logger.info(f"🔄 Crawling - recently updated but no learning points data")
 
-                # Count total videos across all LearnPoints
-                total_videos = sum(len(lp.videos) for lp in learning_points)
+                # Crawl course with retry logic (returns list of LearnPoint objects)
+                learning_points = await self._crawl_course_with_retry(
+                    page, course.url, course.title, item, course
+                )
 
-                self.stats["courses_crawled"] += 1
-                self.stats["total_videos_found"] += total_videos
+                if learning_points:
+                    # Update course with LearnPoint structure
+                    course.learning_points = learning_points
+                    course.last_updated = datetime.now().isoformat()
 
-                logger.info(f"✅ Successfully crawled {total_videos} videos in {len(learning_points)} LearnPoints")
+                    # Count total videos across all LearnPoints
+                    total_videos = sum(len(lp.videos) for lp in learning_points)
 
-                # Save immediately after each successful course
-                logger.info(f"💾 Saving progress to {self.content_file.name}...")
-                self.content_manager.save()
-                logger.info(f"✅ Progress saved!")
-            else:
-                self.stats["courses_failed"] += 1
-                logger.warning(f"⚠️  Failed to crawl course")
+                    self.stats["courses_crawled"] += 1
+                    self.stats["total_videos_found"] += total_videos
 
-            # Human-like delay before next course
-            if course_counter < len(courses_to_crawl):
-                delay = random.uniform(self.min_delay, self.max_delay)
-                logger.info(f"⏳ Waiting {delay:.1f}s before next course...")
-                await asyncio.sleep(delay)
+                    logger.info(f"✅ Successfully crawled {total_videos} videos in {len(learning_points)} LearnPoints")
+
+                    # Save immediately after each successful course
+                    logger.info(f"💾 Saving progress to {self.content_file.name}...")
+                    self.content_manager.save()
+                    logger.info(f"✅ Progress saved!")
+                else:
+                    self.stats["courses_failed"] += 1
+                    logger.warning(f"⚠️  Failed to crawl course")
+
+                # Human-like delay before next course
+                if course_counter < total_courses:
+                    delay = random.uniform(self.min_delay, self.max_delay)
+                    logger.info(f"⏳ Waiting {delay:.1f}s before next course...")
+                    await asyncio.sleep(delay)
 
         # Final save (in case last course failed)
         logger.info(f"\n{'=' * 70}")
@@ -193,7 +197,7 @@ class CourseCrawler:
         page: Page,
         course_url: str,
         course_title: str,
-        category: Optional['Category'] = None,
+        category_or_series = None,
         course: Optional['Course'] = None,
     ) -> Optional[List[LearnPoint]]:
         """
@@ -203,7 +207,7 @@ class CourseCrawler:
             page: Playwright Page object
             course_url: Course page URL
             course_title: Course title (for logging)
-            category: Category object (for download path)
+            category_or_series: Category or Series object (for download path)
             course: Course object (for updating overview, transcript, duration)
 
         Returns:
@@ -309,7 +313,7 @@ class CourseCrawler:
                     await self._download_videos(
                         page=page,
                         learn_points=learn_points,
-                        category_or_series=category.title if category else "Unknown",
+                        category_or_series=category_or_series.title if category_or_series else "Unknown",
                         course_title=course_title
                     )
 

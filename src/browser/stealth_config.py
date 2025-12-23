@@ -247,7 +247,6 @@ def get_browser_launch_args() -> list[str]:
         List of browser arguments
     """
     return [
-        "--disable-blink-features=AutomationControlled",
         "--disable-dev-shm-usage",
         "--no-first-run",
         "--no-default-browser-check",

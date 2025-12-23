@@ -25,7 +25,8 @@ class Video:
         duration: Video duration (e.g., "5:23")
         learning_point: LearnPoint group name
         last_updated: ISO 8601 timestamp
-        is_downloaded: Whether video file has been downloaded (default: False)
+        is_downloaded: Whether video has been downloaded (default: False)
+        is_content: Whether overview/transcript extracted (default: False)
     """
     title: str = ""
     url: str = ""
@@ -34,6 +35,7 @@ class Video:
     learning_point: str = ""
     last_updated: str = ""
     is_downloaded: bool = False
+    is_content: bool = False
 
 
 @dataclass
@@ -194,7 +196,8 @@ class ContentManager:
                                     duration=video_data.get('duration', ''),
                                     learning_point=video_data.get('learning_point', ''),
                                     last_updated=video_data.get('last_updated', ''),
-                                    is_downloaded=video_data.get('is_downloaded', False)
+                                    is_downloaded=video_data.get('is_downloaded', False),
+                                    is_content=video_data.get('is_content', False)
                                 ))
 
                             learning_points.append(LearnPoint(
@@ -260,7 +263,8 @@ class ContentManager:
                                     duration=video_data.get('duration', ''),
                                     learning_point=video_data.get('learning_point', ''),
                                     last_updated=video_data.get('last_updated', ''),
-                                    is_downloaded=video_data.get('is_downloaded', False)
+                                    is_downloaded=video_data.get('is_downloaded', False),
+                                    is_content=video_data.get('is_content', False)
                                 ))
 
                             learning_points.append(LearnPoint(
@@ -391,7 +395,8 @@ class ContentManager:
                                                     'duration': video.duration,
                                                     'learning_point': video.learning_point,
                                                     'last_updated': video.last_updated or datetime.now().isoformat(),
-                                                    'is_downloaded': video.is_downloaded
+                                                    'is_downloaded': video.is_downloaded,
+                                                    'is_content': video.is_content
                                                 }
                                                 for video in lp.videos
                                             ]
@@ -432,7 +437,8 @@ class ContentManager:
                                                 'duration': video.duration,
                                                 'learning_point': video.learning_point,
                                                 'last_updated': video.last_updated or datetime.now().isoformat(),
-                                                'is_downloaded': video.is_downloaded
+                                                'is_downloaded': video.is_downloaded,
+                                                'is_content': video.is_content
                                             }
                                             for video in lp.videos
                                         ]

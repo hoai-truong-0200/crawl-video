@@ -1,297 +1,265 @@
 # 🎥 GLOBIS Video Crawler
 
-Automated system to crawl video courses from GLOBIS Unlimited with advanced anti-detection and multi-language support.
+Automated system to crawl video courses from GLOBIS Unlimited with advanced anti-detection, multi-language support, and comprehensive content extraction.
+
+**Version**: 2.0 | **Last Updated**: 2025-12-22
+
+---
 
 ## 🚀 Features
 
 - ✅ **Advanced Anti-Detection**: Stealth browser automation with human behavior simulation
 - ✅ **Multi-Language Support**: Crawl English (en) and Japanese (ja) courses
-- ✅ **Smart Crawling**: Hierarchical extraction (sites → categories/series → courses → content)
+- ✅ **Smart Crawling**: Hierarchical extraction (sites → categories/series → courses → videos → content + downloads)
+- ✅ **Intelligent Skip Logic**: Time-based + data-based skipping to avoid re-crawling
 - ✅ **Incremental Saving**: Auto-save after each item to prevent data loss
-- ✅ **Auto-Initialization**: JSON files auto-created with correct structure
-- ✅ **Show More Handling**: Automatically clicks "Show More" buttons to load all content
-- ✅ **Selective Crawling**: `--only-empty` flag to skip completed items
-- ✅ **Learning Points**: Extract and organize videos by learning objectives
-- ✅ **Content Extraction**: Extract overview, transcript, and AI summary to text files
-- ✅ **Video Download**: Automated Vimeo video downloads with progress tracking
-- ✅ **Human Behavior Simulation**: Natural delays, mouse movements, and video pause during downloads
-- 🚧 **Cloud Upload**: Google Drive integration (planned)
+- ✅ **Learning Points Extraction**: Organize videos by learning objectives
+- ✅ **Content Extraction**: Extract overview & transcript to separate .txt files
+- ✅ **Video Download**: Automated Vimeo downloads with real-time progress tracking
+- ✅ **Resume Support**: Safe interruption with Ctrl+C, resume anytime
+
+---
 
 ## 📁 Project Structure
 
 ```
 crawl-video/
 ├── src/
-│   ├── browser/          # Anti-detection browser setup
-│   ├── crawler/          # Course & video metadata crawling
+│   ├── browser/              # Anti-detection browser setup
+│   │   └── stealth_config.py
+│   ├── crawler/              # Crawling & parsing modules
 │   │   ├── category_parser.py     # Parse category pages
 │   │   ├── category_crawler.py    # Crawl all categories
 │   │   ├── series_crawler.py      # Crawl all series
-│   │   ├── course_crawler.py      # Crawl course details
+│   │   ├── course_crawler.py      # Extract course details
 │   │   ├── course_parser.py       # Parse course pages
-│   │   ├── content_extractor.py   # Extract course content
-│   │   ├── vimeo_interceptor.py   # Intercept Vimeo download URLs
-│   │   └── content_manager.py     # Manage JSON files
-│   └── utils/            # Helpers and utilities
-│       └── file_downloader.py     # Async file downloader
-│   ├── downloader/       # Video download (planned)
-│   ├── uploader/         # Google Drive integration (planned)
+│   │   ├── video_crawler.py       # Extract video content ⭐NEW
+│   │   └── content_manager.py     # JSON data management
+│   ├── downloader/           # Video download modules
+│   │   ├── vimeo_extractor.py     # Extract Vimeo URLs
+│   │   └── video_downloader.py    # Download videos
+│   └── utils/                # Utilities
+│       └── sites_manager.py        # Manage sites.json
 ├── data/
-│   ├── courses/          # Course metadata JSON files
-│   │   ├── sites.json    # Source URLs for categories/series
-│   │   ├── en/           # English content
-│   │   │   ├── learn-content.json    # Categories and courses
-│   │   │   └── explore-content.json  # Series and courses
-│   │   └── ja/           # Japanese content
-│   │       ├── learn-content.json
-│   │       └── explore-content.json
+│   ├── courses/              # Course metadata
+│   │   ├── sites.json        # Source URLs
+│   │   ├── en/               # English content
+│   │   │   ├── learn-content.json    # Categories
+│   │   │   └── explore-content.json  # Series
+│   │   └── ja/               # Japanese content
 │   └── chrome_profile_copy/  # Chrome profile for auth
-├── downloads/            # Downloaded videos and extracted content
-│   ├── en/              # English content
-│   │   ├── categories/  # From learn-content
-│   │   │   └── [category_title]/
-│   │   │       └── [course_title]/
+├── downloads/                # Downloaded content
+│   ├── en/
+│   │   ├── categories/
+│   │   │   └── [Category]/
+│   │   │       └── [Course]/
 │   │   │           ├── overview.txt
 │   │   │           ├── transcript.txt
-│   │   │           ├── summary.txt (if available)
-│   │   │           └── [learning_point_title]/
-│   │   │               └── [video_title].mp4
-│   │   └── series/      # From explore-content
-│   │       └── [series_title]/
-│   │           └── [course_title]/
-│   │               ├── overview.txt
-│   │               ├── transcript.txt
-│   │               ├── summary.txt
-│   │               └── [learning_point_title]/
-│   │                   └── [video_title].mp4
-│   └── ja/              # Japanese content (same structure)
-├── docs/                 # Documentation
-├── logs/                 # Application logs
-├── tests/                # Unit tests
-└── run_browser.py        # Main entry point
+│   │   │           └── [Learning Point]/
+│   │   │               └── [Video].mp4
+│   │   └── series/
+│   └── ja/
+├── docs/                     # Documentation
+│   ├── SUMMARY.md            # Comprehensive system summary ⭐NEW
+│   ├── SITES_OPTION.md
+│   └── TECH_RESEARCH.md
+└── run_browser.py            # Main entry point
 ```
+
+---
 
 ## 🛠️ Tech Stack
 
 - **Browser Automation**: Playwright (async) + stealth techniques
-- **Parsing**: BeautifulSoup4 for HTML parsing
-- **Logging**: loguru for structured logging
-- **Data Management**: JSON-based with auto-initialization
-- **Video Download**: yt-dlp + ffmpeg (planned)
-- **Cloud Storage**: Google Drive API v3 (planned)
+- **Parsing**: BeautifulSoup4
+- **Logging**: loguru
+- **Video Download**: yt-dlp + ffmpeg
+- **Data**: JSON with auto-initialization
+
+---
 
 ## 📦 Installation
 
 ### Prerequisites
-
 - Python 3.10+
-- Google Chrome browser (for authentication)
+- Google Chrome
+- ffmpeg (for video processing)
 
 ### Setup
 
-1. **Clone repository**:
 ```bash
+# 1. Clone repository
 git clone <repo-url>
 cd crawl-video
-```
 
-2. **Create virtual environment**:
-```bash
+# 2. Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-3. **Install dependencies**:
-```bash
+# 3. Install Python dependencies
 pip install -r requirements.txt
 playwright install chromium
-```
 
-4. **Prepare data directory**:
-```bash
+# 4. Install ffmpeg (system dependency)
+# Ubuntu/Debian:
+sudo apt install ffmpeg
+
+# macOS:
+brew install ffmpeg
+
+# Windows:
+# Download from https://ffmpeg.org/download.html
+
+# 5. Create data directories
 mkdir -p data/courses/{en,ja}
 ```
 
-5. **Configure sites.json** (optional):
-   - Edit `data/courses/sites.json` to add/modify source URLs
-   - Default configuration provided for GLOBIS Unlimited
+---
 
 ## 🎯 Usage
 
-### Crawling Workflow
-
-The crawler follows a hierarchical structure:
-
-```
-1. sites     → Parse initial categories/series from sites.json
-2. categories → Crawl category details (course lists)
-3. series    → Crawl series details (course lists)
-4. courses   → Extract course details (duration, learning_points, videos)
-5. content   → Extract course content (overview, transcript, summary) to txt files
-6. downloads → Download videos [planned]
-```
-
-### Basic Commands
+### Quick Start
 
 ```bash
-# Parse initial categories and series from sites.json
-python3 run_browser.py sites            # All languages
-python3 run_browser.py sites en         # English only
-python3 run_browser.py sites ja         # Japanese only
-
-# Crawl category details (course lists)
-python3 run_browser.py categories       # All categories
-python3 run_browser.py categories en    # English only
-
-# Crawl series details (course lists)
-python3 run_browser.py series           # All series
-python3 run_browser.py series ja        # Japanese only
-
-# Crawl course details (duration + learning_points + videos)
-python3 run_browser.py courses          # All courses
-python3 run_browser.py courses en       # English only
-
-# Extract course content (overview, transcript, summary)
-python3 run_browser.py content          # All courses
-python3 run_browser.py content en       # English only
-python3 run_browser.py content ja       # Japanese only
-
-# Run full workflow
-python3 run_browser.py all              # sites → categories → series → courses → content
-```
-
-### Selective Crawling
-
-### Crawling Workflow
-
-The crawler follows a hierarchical structure:
-
-```
-1. sites     → Parse initial categories/series from sites.json
-2. categories → Crawl category details (course lists)
-3. series    → Crawl series details (course lists)
-4. courses   → Extract course details (duration, learning_points, videos)
-5. content   → Extract course content (overview, transcript, summary) to txt files
-6. downloads → Download videos (Vimeo) to local storage
-```
-
-### Basic Commands
-Use `--only-empty` flag to skip items that already have data:
-
-```bash
-# Only crawl categories with empty courses list
-python3 run_browser.py categories --only-empty
-
-# Only crawl courses with empty learning_points
-python3 run_browser.py courses --only-empty
-
-# Only extract content from courses without existing txt files
-python3 run_browser.py content --only-empty
-
-# Crawl course details (duration + learning_points + videos)
-python3 run_browser.py courses          # All courses
-python3 run_browser.py courses en       # English only
-
-# Extract course content (overview, transcript, summary)
-python3 run_browser.py content          # All courses
-python3 run_browser.py content en       # English only
-python3 run_browser.py content ja       # Japanese only
-
-# Download videos
-python3 run_browser.py downloads        # All videos
-python3 run_browser.py downloads en     # English only
-python3 run_browser.py downloads ja     # Japanese only
-
-# Run full workflow
-python3 run_browser.py all              # sites → categories → series → courses → content
-# Only extract Japanese content missing files
-python3 run_browser.py content ja --only-empty
-```
-
-### Examples
-
-```bash
-# Initial setup: Parse all categories and series
+# 1. Parse initial site structure
 python3 run_browser.py sites
 
-# Get course lists for English categories
-python3 run_browser.py categories en
+# 2. Crawl categories and series
+python3 run_browser.py categories
+python3 run_browser.py series
 
-# Extract course details for all languages
+# 3. Extract course details
 python3 run_browser.py courses
 
-# Only extract Japanese content missing files
-python3 run_browser.py content ja --only-empty
-
-# Only download videos not yet downloaded (is_downloaded == false)
-python3 run_browser.py downloads --only-empty
-
-# Only download missing English videos
-python3 run_browser.py downloads en --only-empty
-```
-
-### Examples
-
-```bash
-# Initial setup: Parse all categories and series
-python3 run_browser.py sites
-
-# Get course lists for English categories
-python3 run_browser.py categories en
-
-# Extract course details for all languages
-python3 run_browser.py courses
-
-# Extract course content (overview/transcript/summary)
+# 4. Extract video content (overview + transcript)
 python3 run_browser.py content
 
-# Resume interrupted content extraction (skip existing)
-python3 run_browser.py content --only-empty
-
-# Download all videos
+# 5. Download videos
 python3 run_browser.py downloads
 
-# Resume interrupted downloads (skip already downloaded)
-python3 run_browser.py downloads --only-empty
+# OR run everything at once:
+python3 run_browser.py all
 ```
 
-## ⚙️ Configuration
+### Available Options
 
-### sites.json Structure
+| Option | Description | Output |
+|--------|-------------|--------|
+| `sites` | Parse categories/series lists | `learn-content.json`, `explore-content.json` |
+| `categories` | Crawl category details + course lists | Updated `learn-content.json` |
+| `series` | Crawl series details + course lists | Updated `explore-content.json` |
+| `courses` | Extract learning points + videos | Updated JSON with `learning_points` |
+| `content` | Extract overview/transcript to .txt | `downloads/.../overview.txt`, `transcript.txt` |
+| `downloads` | Download video files | `downloads/.../*.mp4` |
+| `all` | Run full workflow | All of the above |
 
-Configure source URLs in `data/courses/sites.json`:
+### Language Selection
 
-```json
-{
-  "en": {
-    "learn": "xxx",
-    "explore": "xxx"
-  },
-  "ja": {
-    "learn": "xxx",
-    "explore": "xxx"
-  }
-}
+```bash
+# Crawl specific language
+python3 run_browser.py courses en    # English only
+python3 run_browser.py content ja    # Japanese only
+
+# Crawl all languages (default)
+python3 run_browser.py courses       # Both en and ja
 ```
 
-### Data Structure
+### Skip Logic
 
-**learn-content.json** (Categories):
+All options automatically skip recently-updated items to save time:
+
+**Categories/Series**: Skip if updated < 14 days **AND** has courses
+```bash
+# Will skip categories crawled in last 2 weeks that have course data
+python3 run_browser.py categories
+```
+
+**Courses**: Skip if updated < 14 days **AND** has learning_points
+```bash
+# Will skip courses crawled in last 2 weeks that have learning points
+python3 run_browser.py courses
+```
+
+**Content**: Skip if `is_content == true`
+```bash
+# Will skip videos that already have overview/transcript extracted
+python3 run_browser.py content
+```
+
+**Downloads**: Skip if `is_downloaded == true`
+```bash
+# Will skip videos already downloaded
+python3 run_browser.py downloads
+```
+
+---
+
+## 📊 Workflow Diagram
+
+```
+┌──────────┐
+│  sites   │  Parse category/series URLs from sites.json
+└────┬─────┘
+     │
+     ├─────────────┬─────────────┐
+     │             │             │
+┌────▼─────┐  ┌───▼───────┐    ...
+│categories│  │  series   │
+└────┬─────┘  └───┬───────┘
+     │            │
+     └────────┬───┘
+              │
+         ┌────▼────┐
+         │ courses │  Extract learning_points + videos
+         └────┬────┘
+              │
+         ┌────▼────┐
+         │ content │  Extract overview + transcript → .txt
+         └────┬────┘
+              │
+         ┌────▼─────┐
+         │downloads │  Download video files → .mp4
+         └──────────┘
+```
+
+---
+
+## 📖 Data Structure
+
+### JSON Structure (learn-content.json / explore-content.json)
+
 ```json
 {
   "language": "en",
-  "last_updated": "2025-12-10T12:00:00",
+  "last_updated": "2025-12-22T10:00:00",
   "categories": [
     {
-      "title": "Category Name",
-      "url": "https://...",
-      "last_updated": "...",
+      "title": "Critical Thinking",
+      "url": "/en/categories/123",
+      "last_updated": "2025-12-22T10:00:00",
       "courses": [
         {
-          "title": "Course Title",
-          "url": "https://...",
+          "title": "Adaptive Thinking",
+          "url": "/en/courses/456",
           "duration": 50,
-          "learning_points": [...]
+          "last_updated": "2025-12-22T11:00:00",
+          "learning_points": [
+            {
+              "title": "Introduction",
+              "videos": [
+                {
+                  "title": "What Is Adaptive Thinking",
+                  "url": "/en/courses/456/steps/789",
+                  "step_id": "789",
+                  "duration": "5:23",
+                  "learning_point": "Introduction",
+                  "last_updated": "2025-12-22T11:00:00",
+                  "is_downloaded": false,
+                  "is_content": false
+                }
+              ]
+            }
+          ]
         }
       ]
     }
@@ -299,83 +267,161 @@ Configure source URLs in `data/courses/sites.json`:
 }
 ```
 
-**explore-content.json** (Series):
+### File Output Structure
+
+```
+downloads/
+├── en/
+│   ├── categories/
+│   │   └── Critical Thinking/
+│   │       └── Adaptive Thinking/
+│   │           ├── overview.txt          # Course overview
+│   │           ├── transcript.txt        # Course transcript
+│   │           └── Introduction/
+│   │               └── What Is Adaptive Thinking.mp4
+│   └── series/
+│       └── Business Essentials/
+│           └── [Course]/
+│               ├── overview.txt
+│               ├── transcript.txt
+│               └── [Learning Point]/
+│                   └── [Video].mp4
+```
+
+---
+
+## ⚙️ Configuration
+
+### sites.json
+
+Edit `data/courses/sites.json` to configure source URLs:
+
 ```json
 {
-  "series": [
-    {
-      "title": "Series Name",
-      "url": "https://...",
-      "last_updated": "...",
-      "courses": [...]
-    }
+  "en": [
+    "https://unlimited.globis.co.jp/en/explore-content",
+    "https://unlimited.globis.co.jp/en/learn-content"
+  ],
+  "ja": [
+    "https://unlimited.globis.co.jp/ja/learn-content",
+    "https://unlimited.globis.co.jp/ja/explore-content"
   ]
 }
 ```
 
-## 📖 Documentation
+### settings.py
 
-- [Sites Option](docs/SITES_OPTION.md) - Details on sites parsing
-- [Tech Research](docs/TECH_RESEARCH.md) - Technology selection and analysis
-- [TODO List](TODO.md) - Development roadmap and progress
+Key settings in `config/settings.py`:
+- Delays: `MIN_DELAY=1.5s`, `MAX_DELAY=3.0s`
+- Retries: `MAX_RETRIES=3`
+- Browser arguments (anti-detection)
 
-## 🔒 Security & Privacy
-
-- Use anti-detection responsibly and ethically
-- Respect website terms of service and rate limits
-- Chrome profile is copied to `data/chrome_profile_copy/` for session persistence
-- Manual login required only once per session
+---
 
 ## 🐛 Troubleshooting
 
 ### Browser Issues
-- If login fails, try running in headed mode (default)
-- Clear Chrome profile: `rm -rf data/chrome_profile_copy/`
-- Check browser logs in console
-
-### Crawling Issues
-- **Empty results**: Check if "Show More" button was clicked properly
-- **Duration not found**: Verify course page HTML structure matches selectors
-- **Learning points missing**: Ensure "Content" tab is being clicked
-- **Content extraction fails**: Check if tabs (Overview/Transcript) exist on page
-- **Summary not extracted**: Summary tab is optional and may not exist for all courses
-- Check logs for detailed error messages
-
-### Data Issues
-- **JSON parse errors**: Files are auto-initialized if corrupt
-- **Missing data**: Use `--only-empty` to re-crawl incomplete items
-- **Duplicate entries**: Each item has unique URL as identifier
-- **Invalid filenames**: Special characters in titles are sanitized to underscores
-
-## 📝 Development
-
-### Project Status
-
-**Current Phase**: Content extraction complete ✅
-- ✅ Sites parsing with Show More handling
-- ✅ Categories and series crawling
-- ✅ Course details extraction (duration + learning_points)
-- ✅ Multi-language support (EN/JA)
-- ✅ Incremental saving and auto-initialization
-- ✅ Selective crawling with `--only-empty`
-- ✅ Content extraction (overview, transcript, summary) to text files
-- 🚧 Video download with yt-dlp
-- 🚧 Google Drive upload
-
-### Running Tests
-
 ```bash
-pytest tests/
+# Clear Chrome profile and retry
+rm -rf data/chrome_profile_copy/
+python3 run_browser.py sites
 ```
 
-## 📄 License
+### Empty Results
+- Check if "Show More" button was clicked
+- Verify page HTML structure
+- Check logs for error messages
 
-MIT License
+### Skip Logic Issues
+```bash
+# Force re-crawl by deleting last_updated from JSON
+# Or wait 14 days for automatic re-crawl
+```
 
-## ⚠️ Disclaimer
+### Download Failures
+```bash
+# Verify ffmpeg installed
+ffmpeg -version
 
-This tool is for educational purposes only. Ensure you have proper authorization before crawling any website. Respect robots.txt and website terms of service.
+# Check yt-dlp version
+yt-dlp --version
+
+# Update yt-dlp
+pip install --upgrade yt-dlp
+```
 
 ---
 
-**Last Updated**: 2025-12-11
+## 📚 Documentation
+
+- **[SUMMARY.md](docs/SUMMARY.md)** - Comprehensive system documentation (NEW ⭐)
+- **[SITES_OPTION.md](docs/SITES_OPTION.md)** - Sites parsing details
+- **[TECH_RESEARCH.md](docs/TECH_RESEARCH.md)** - Technology research
+- **[TODO.md](TODO.md)** - Development roadmap
+
+---
+
+## 🚧 Project Status
+
+**Current Version**: 2.0 ✅
+
+### Completed Features
+- ✅ Sites parsing with Show More handling
+- ✅ Categories and series crawling
+- ✅ Course details extraction (duration + learning_points)
+- ✅ Video content extraction (overview + transcript to .txt)
+- ✅ Video downloads with progress tracking
+- ✅ Multi-language support (EN/JA)
+- ✅ Incremental saving
+- ✅ Smart skip logic (time + data based)
+
+### Planned Features
+- [ ] Video quality selection (720p, 1080p)
+- [ ] Parallel downloads
+- [ ] Google Drive integration
+- [ ] Web UI for monitoring
+- [ ] Docker containerization
+
+---
+
+## 🔒 Security & Privacy
+
+### Anti-Detection
+- Playwright stealth mode
+- Human behavior simulation
+- Random delays (1.5-5.0s)
+- Chrome profile persistence
+
+### Data Privacy
+- All data stored locally
+- No credential storage
+- Manual login required (one-time per session)
+- Session persists in Chrome profile
+
+### Best Practices
+- Respect rate limits (built-in delays)
+- One session at a time per language
+- Clean shutdown (Ctrl+C safe)
+
+---
+
+## 📄 License
+
+MIT License - See LICENSE file
+
+---
+
+## ⚠️ Disclaimer
+
+**Educational purposes only**. Ensure you have proper authorization before crawling any website. Respect robots.txt and website terms of service.
+
+**Copyright**: Downloaded content may be copyrighted. Use responsibly and in accordance with GLOBIS Unlimited terms of service.
+
+---
+
+**Quick Links**:
+- 📖 [Full Documentation](docs/SUMMARY.md)
+- 🐛 [Report Issues](https://github.com/your-repo/issues)
+- 💬 [Discussions](https://github.com/your-repo/discussions)
+
+**Last Updated**: 2025-12-22 | **Maintainer**: Development Team
