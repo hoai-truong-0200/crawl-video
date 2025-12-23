@@ -47,7 +47,7 @@ playwright-state/
 cookies.txt
 
 # Chrome Profile (contains user data, DO NOT commit)
-data/chrome_profile_copy/
+data/chrome_profile*/
 
 data/samples/*
 

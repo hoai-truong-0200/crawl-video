@@ -130,12 +130,8 @@ def main():
         'src/downloader',
         'src/uploader',
         'src/utils',
-        'config',
-        'data/downloads',
-        'data/sessions',
-        'data/cache',
-        'logs',
-        'docs',
+        'data/courses',
+        'downloads',
     ]
 
     base_dir = Path(__file__).parent
@@ -146,18 +142,17 @@ def main():
         if full_path.exists():
             print(f"   ✅ {dir_path}/")
         else:
-            print(f"   ❌ {dir_path}/ - NOT FOUND")
-            structure_ok = False
+            print(f"   ⚠️  {dir_path}/ - Will be created on first run")
 
-    if not structure_ok:
-        all_passed = False
+    # Don't fail if directories don't exist, they'll be created automatically
+    # structure_ok is always True now
 
     print("\n🔍 Checking configuration files...")
     config_files = [
-        '.env.example',
         'requirements.txt',
         'README.md',
-        'TODO.md',
+        'run_browser.py',
+        'verify_setup.py',
     ]
 
     config_ok = True
@@ -172,26 +167,40 @@ def main():
     if not config_ok:
         all_passed = False
 
-    # Optional: Check .env file
-    env_path = base_dir / '.env'
-    if env_path.exists():
-        print(f"   ✅ .env (configured)")
-    else:
-        print(f"   ⚠️  .env - NOT FOUND (copy from .env.example)")
+    # Optional files (don't fail if missing)
+    optional_files = [
+        ('.env.example', 'Template for environment configuration'),
+        ('.env', 'Environment configuration (will use defaults if missing)'),
+    ]
+
+    for file_name, description in optional_files:
+        file_path = base_dir / file_name
+        if file_path.exists():
+            print(f"   ✅ {file_name}")
+        else:
+            print(f"   ℹ️  {file_name} - Optional ({description})")
 
     # Summary
     print("\n" + "="*60)
     if all_passed:
         print("✅ ALL CHECKS PASSED!")
-        print("\nNext steps:")
-        print("1. Copy .env.example to .env and configure")
-        print("2. Install Playwright browsers: playwright install chromium")
-        print("3. Setup Google Drive credentials (if needed)")
-        print("4. Run: python main.py")
+        print("\nYour environment is ready to use!")
+        print("\nQuick start:")
+        print("1. Run: python3 run_browser.py <mode>")
+        print("")
+        print("Available modes:")
+        print("  - sites      : Parse initial categories/series")
+        print("  - categories : Crawl category details")
+        print("  - series     : Crawl series details")
+        print("  - courses    : Crawl course details and videos")
+        print("  - content    : Extract course content (overview + transcript)")
+        print("  - downloads  : Download videos")
+        print("")
+        print("Example: python3 run_browser.py content en")
     else:
         print("❌ SOME CHECKS FAILED")
         print("\nPlease fix the issues above and run this script again.")
-        print("See docs/SETUP.md for detailed setup instructions.")
+        print("Or run: ./quick_install.sh")
     print("="*60 + "\n")
 
     return 0 if all_passed else 1

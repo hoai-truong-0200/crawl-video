@@ -88,7 +88,10 @@ DATA FILES:
 - data/courses/ja/learn-content.json: Japanese categories and courses
 - data/courses/ja/explore-content.json: Japanese series and courses
 
-NOTE: 'init' option reserved for future Chrome profile copying feature
+PROFILE MANAGEMENT:
+- Use 'init' mode to copy Chrome profile with cookies and sessions
+- Supports interactive profile selection
+- Preserves authentication state for future runs
 """
 
 import asyncio
@@ -115,9 +118,8 @@ from loguru import logger
 # CONFIGURATION
 # ============================================================
 
-# Chrome profile paths
-SOURCE_PROFILE = Path.home() / ".config/google-chrome/Profile 1"
-DEST_PROFILE = Path("data/chrome_profile_copy")
+# Chrome profile path (destination for copied profile)
+DEST_PROFILE = Path("data/chrome_profile")
 
 # GLOBIS URLs
 LOGIN_URL = "https://unlimited.globis.co.jp/signin?locale=en"
@@ -133,45 +135,46 @@ EXPLORE_CONTENT_FILE = Path("data/courses/en/explore-content.json")
 # ============================================================
 
 def copy_chrome_profile() -> bool:
-    """Copy Chrome profile if not exists"""
+    """
+    Copy Chrome profile using ChromeProfileManager
 
+    If profile already exists, skip.
+    Otherwise, prompt user to select a profile interactively.
+
+    Returns:
+        True if profile exists or copied successfully, False otherwise
+    """
+    from src.browser.profile_manager import ChromeProfileManager
+
+    # Check if profile already exists
     if DEST_PROFILE.exists():
         logger.info(f"✅ Chrome profile already exists: {DEST_PROFILE}")
         return True
 
-    if not SOURCE_PROFILE.exists():
-        logger.error(f"❌ Source Chrome profile not found: {SOURCE_PROFILE}")
-        logger.info("Available Chrome profiles:")
-        chrome_dir = Path.home() / ".config/google-chrome"
-        if chrome_dir.exists():
-            for item in chrome_dir.iterdir():
-                if item.is_dir() and ("Profile" in item.name or item.name == "Default"):
-                    logger.info(f"  - {item.name}")
+    # Profile doesn't exist, need to copy
+    logger.info("📋 Chrome profile not found, need to copy from existing profile")
+    logger.info("")
+
+    # Create profile manager
+    profile_manager = ChromeProfileManager(dest_profile=DEST_PROFILE)
+
+    # Interactive profile selection
+    source_profile = profile_manager.select_profile_interactive()
+
+    if not source_profile:
+        logger.error("❌ No profile selected")
+        logger.info("\nTo copy a profile later, run: python3 run_browser.py init")
         return False
 
-    logger.info(f"📋 Copying Chrome profile...")
-    logger.info(f"   From: {SOURCE_PROFILE}")
-    logger.info(f"   To:   {DEST_PROFILE}")
+    # Copy profile
+    success = profile_manager.copy_profile(source_profile, force=False)
 
-    try:
-        # Get profile size
-        import subprocess
-        result = subprocess.run(
-            ["du", "-sh", str(SOURCE_PROFILE)],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            size = result.stdout.split()[0]
-            logger.info(f"   Size: {size}")
-
-        # Copy profile
-        shutil.copytree(SOURCE_PROFILE, DEST_PROFILE, dirs_exist_ok=True)
+    if success:
         logger.info("✅ Chrome profile copied successfully")
+        logger.info(f"   Saved to: {DEST_PROFILE}")
         return True
-
-    except Exception as e:
-        logger.error(f"❌ Failed to copy profile: {e}")
+    else:
+        logger.error("❌ Failed to copy profile")
         return False
 
 
@@ -298,89 +301,166 @@ async def ensure_logged_in(page):
 
     # Check if logged in - try multiple selectors
     login_indicators = [
+        # Profile image (most reliable indicator)
+        "[class*='_ProfileImage']",
+        "._ProfileImage",
+        # Signout links
         "a[href*='signout']",
         "a[href*='/signout']",
         "[href*='signout']",
-        "text=Sign Out",
-        "text=サインアウト",
+        "button:has-text('Sign Out')",
+        "button:has-text('サインアウト')",
+        "a:has-text('Sign Out')",
+        "a:has-text('サインアウト')",
+        # User menu/profile indicators
+        "[data-testid='user-menu']",
+        "[class*='user-menu']",
+        "[class*='UserMenu']",
+        "button[aria-label*='user']",
+        "button[aria-label*='account']",
+        # Avatar/profile icon
+        "[class*='avatar']",
+        "[class*='Avatar']",
+        "img[alt*='profile']",
     ]
 
     is_logged_in = False
+    found_selector = None
+
     for selector in login_indicators:
         try:
             elem = await page.query_selector(selector)
             if elem:
-                logger.info(f"✅ Already logged in! (found: {selector})")
                 is_logged_in = True
+                found_selector = selector
                 break
         except Exception:
             continue
 
-    # Also check if we're NOT on login page
-    current_url = page.url
-    if "/signin" not in current_url.lower() and not is_logged_in:
-        # Might be logged in, just can't find selector
-        logger.info(f"✅ On home page (not login page): {current_url}")
-        logger.info("Assuming logged in (not on signin page)")
-        is_logged_in = True
-
+    # If found login indicator, return success
     if is_logged_in:
+        logger.info(f"✅ Already logged in! (found: {found_selector})")
+        logger.info("✅ Login verified successfully")
         return True
 
-    # Not logged in - need manual login
+    # Not logged in - check URL and page title for debugging
+    current_url = page.url
+    try:
+        page_title = await page.title()
+    except:
+        page_title = "Unknown"
+
+    logger.warning(f"⚠️  No login indicators found")
+    logger.debug(f"   URL: {current_url}")
+    logger.debug(f"   Title: {page_title}")
+
+    # Not logged in - need manual login or re-copy profile
     logger.warning("⚠️  Not logged in yet")
-    logger.info(f"🔗 Navigating to login page: {LOGIN_URL}")
+    logger.warning("Profile may not contain valid cookies/sessions")
 
-    await page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
-
-    logger.info("\n" + "=" * 60)
-    logger.info("👉 PLEASE LOGIN MANUALLY")
-    logger.info("=" * 60)
-    logger.info("Steps:")
-    logger.info("  1. Enter your GLOBIS credentials in the browser")
-    logger.info("  2. Click 'Sign In'")
-    logger.info("  3. Wait for redirect to home page")
-    logger.info("\n⏳ Waiting for login... (timeout: 10 minutes)")
-    logger.info("Looking for these indicators:")
-    for indicator in login_indicators:
-        logger.info(f"  - {indicator}")
-
-    # Wait for login success - check multiple conditions
-    start_time = asyncio.get_event_loop().time()
-    timeout_seconds = 600  # 10 minutes
+    print("\n" + "=" * 70)
+    print("❌ LOGIN REQUIRED")
+    print("=" * 70)
+    print("\nChoose an option:")
+    print("[1] Login manually in browser (then cookies will be saved)")
+    print("[2] Re-copy profile from Chrome (to get fresh cookies/sessions)")
+    print("[0] Cancel and exit")
+    print("=" * 70)
 
     while True:
-        elapsed = asyncio.get_event_loop().time() - start_time
-        if elapsed > timeout_seconds:
-            logger.error("❌ Login timeout (10 minutes)")
-            return False
+        try:
+            choice = input("\nSelect option [1/2/0]: ").strip()
 
-        # Check if URL changed away from login page
-        current_url = page.url
-        if "/signin" not in current_url.lower():
-            logger.info(f"\n✅ URL changed from login page: {current_url}")
-            await asyncio.sleep(2)  # Wait for page to settle
+            if choice == "0":
+                logger.info("❌ User cancelled")
+                return False
 
-            # Double-check with selectors
-            for selector in login_indicators:
-                try:
-                    elem = await page.query_selector(selector)
-                    if elem:
-                        logger.info(f"✅ LOGIN SUCCESSFUL! (found: {selector})")
-                        logger.info("🎉 Session saved - you won't need to login again!")
-                        await asyncio.sleep(2)
-                        return True
-                except Exception:
+            elif choice == "1":
+                # Option 1: Manual login
+                logger.info("🔑 Selected: Manual login")
+                logger.info(f"🔗 Navigating to login page: {LOGIN_URL}")
+
+                await page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
+
+                print("\n" + "=" * 60)
+                print("👉 PLEASE LOGIN MANUALLY")
+                print("=" * 60)
+                print("Steps:")
+                print("  1. Enter your GLOBIS credentials in the browser")
+                print("  2. Click 'Sign In'")
+                print("  3. Wait for redirect to home page")
+                print("  4. Press ENTER when login complete")
+                print("=" * 60)
+
+                # Wait for Enter key
+                input("\n⏎ Press ENTER after you've logged in...")
+
+                # Re-check login status
+                logger.info("\n🔍 Re-checking login status...")
+
+                # Navigate to home page to verify login
+                await page.goto("https://unlimited.globis.co.jp/ja", wait_until="domcontentloaded", timeout=60000)
+                await asyncio.sleep(3)
+
+                # Check login indicators again
+                is_logged_in_now = False
+                found_selector_now = None
+
+                for selector in login_indicators:
+                    try:
+                        elem = await page.query_selector(selector)
+                        if elem:
+                            is_logged_in_now = True
+                            found_selector_now = selector
+                            break
+                    except Exception:
+                        continue
+
+                if is_logged_in_now:
+                    logger.info(f"✅ LOGIN SUCCESSFUL! (found: {found_selector_now})")
+                    logger.info("🎉 Session saved - you won't need to login again!")
+                    return True
+                else:
+                    logger.warning("⚠️  Still not logged in")
+                    logger.warning("Please try again or choose a different option")
+                    # Loop back to menu
                     continue
 
-            # If URL changed but no selector found, assume success anyway
-            logger.info("✅ LOGIN SUCCESSFUL! (URL redirected)")
-            logger.info("🎉 Session saved - you won't need to login again!")
-            await asyncio.sleep(2)
-            return True
+            elif choice == "2":
+                # Option 2: Re-copy profile
+                logger.info("📋 Selected: Re-copy profile")
 
-        # Wait a bit before next check
-        await asyncio.sleep(1)
+                from src.browser.profile_manager import ChromeProfileManager
+
+                # Create profile manager
+                profile_manager = ChromeProfileManager(dest_profile=DEST_PROFILE)
+
+                # Interactive profile selection
+                source_profile = profile_manager.select_profile_interactive()
+
+                if not source_profile:
+                    logger.error("❌ No profile selected")
+                    return False
+
+                # Copy profile with force=True to overwrite
+                success = profile_manager.copy_profile(source_profile, force=True)
+
+                if not success:
+                    logger.error("❌ Failed to copy profile")
+                    return False
+
+                logger.info("\n✅ Profile re-copied successfully")
+                logger.info("⚠️  Please RESTART the script to use new profile")
+                logger.info("   (Browser needs to reload with fresh cookies)")
+                return False
+
+            else:
+                print("❌ Invalid choice. Please enter 1, 2, or 0")
+                continue
+
+        except KeyboardInterrupt:
+            print("\n\n❌ Cancelled by user")
+            return False
 
 
 # ============================================================
@@ -1509,12 +1589,22 @@ async def main(mode: str = "test", language: str = None, only_empty: bool = Fals
             logger.info("\n👋 Closing browser...")
 
         elif mode == "init":
-            # NEW: Simple Chrome profile copy functionality
-            logger.info("\n📋 STEP 4: Copy Chrome Profile")
-            logger.info("\nThis feature will copy Chrome profile for authentication.")
-            logger.info("Currently under development - use 'sites' option instead.")
-            logger.info("\nUsage:")
-            logger.info("  python3 run_browser.py sites [language]")
+            # Init mode: Setup is already done in STEP 1-3
+            # If we reached here, login was successful
+            logger.info("\n" + "=" * 70)
+            logger.info("✅ INITIALIZATION COMPLETE")
+            logger.info("=" * 70)
+            logger.info("\n📋 Setup Summary:")
+            logger.info(f"  ✅ Chrome profile: {DEST_PROFILE}")
+            logger.info("  ✅ Browser launched successfully")
+            logger.info("  ✅ Login verified")
+            logger.info("\nYou can now use other modes to crawl:")
+            logger.info("  - sites      : Parse initial categories/series")
+            logger.info("  - categories : Crawl category details")
+            logger.info("  - series     : Crawl series details")
+            logger.info("  - courses    : Crawl course details and videos")
+            logger.info("  - content    : Extract course content (overview + transcript)")
+            logger.info("  - downloads  : Download videos")
 
             # Close browser automatically
             logger.info("\n👋 Closing browser...")
@@ -1942,14 +2032,14 @@ if __name__ == "__main__":
         logger.info("Usage: python3 run_browser.py [mode] [language]")
         logger.info("")
         logger.info("Modes:")
-        logger.info("  sites      - Crawl initial categories/series from sites.json URLs (NEW!)")
-        logger.info("  init       - Copy Chrome profile for authentication (under development)")
-        logger.info("  test       - Test single category parsing (default)")
+        logger.info("  init       - Copy Chrome profile (cookies + sessions) for authentication")
+        logger.info("  sites      - Crawl initial categories/series from sites.json URLs")
         logger.info("  categories - Crawl all categories (learn-content)")
         logger.info("  series     - Crawl all series (explore-content)")
         logger.info("  courses    - Crawl course details (overview, transcript, duration)")
         logger.info("  content    - Extract course content (overview/transcript/summary) to txt files")
-        logger.info("  downloads  - Download all videos (Phase 4)")
+        logger.info("  downloads  - Download all videos")
+        logger.info("  test       - Test single category parsing (debug mode)")
         logger.info("  all        - Crawl categories + series + courses + content")
         logger.info("")
         logger.info("Language (optional):")
