@@ -111,7 +111,15 @@ from src.crawler.series_crawler import SeriesCrawler
 from src.crawler.course_crawler import CourseCrawler
 from src.crawler.content_manager import ContentManager, Category, Series
 from src.utils.sites_manager import SitesManager
-from loguru import logger
+from src.utils.logger_config import setup_logger
+
+# Setup logger
+logger = setup_logger(
+    log_dir="logs",
+    app_name="crawl",
+    console_level="INFO",
+    file_level="DEBUG"
+)
 
 
 # ============================================================

@@ -42,8 +42,9 @@ class ContentExtractor:
         Extract overview text from course page
 
         Steps:
-        1. Click tab button with class containing "__TabButton" and text "Overview" or "概要"
-        2. Extract all text from element with class containing "__courseInfoDetail"
+        1. Wait for tab buttons to appear (dynamic content)
+        2. Wait for overview content to appear
+        3. Extract all text from element with class containing "courseInfoDetail"
 
         Args:
             page: Playwright Page object (on course page)
@@ -56,29 +57,51 @@ class ContentExtractor:
             await page.wait_for_load_state("domcontentloaded", timeout=10000)
             logger.debug("Page loaded, waiting for dynamic content...")
 
-            # Additional wait for dynamic content to render
-            await asyncio.sleep(2)
+            # CRITICAL: Wait for tab buttons to appear (indicates page is ready)
+            try:
+                await page.wait_for_selector('button[class*="TabButton"]', timeout=15000, state="visible")
+                logger.debug("Tab buttons appeared, page is ready")
+            except Exception as e:
+                logger.warning(f"Tab buttons did not appear: {e}")
+                # Continue anyway, maybe already loaded
 
-            # Click Overview/概要 tab
-            overview_button = page.locator('button[class*="__TabButton"]').filter(
+            # CRITICAL: Wait for overview content to appear
+            try:
+                await page.wait_for_selector('[class*="courseInfoDetail"]', timeout=15000, state="visible")
+                logger.debug("Overview content appeared")
+            except Exception as e:
+                logger.warning(f"Overview content did not appear: {e}")
+                return ""
+
+            # Small delay to ensure content is fully rendered
+            await asyncio.sleep(1)
+
+            # Check if Overview tab is already active (should be by default)
+            overview_button = page.locator('button[class*="TabButton"]').filter(
                 has_text="Overview"
             ).or_(
-                page.locator('button[class*="__TabButton"]').filter(has_text="概要")
+                page.locator('button[class*="TabButton"]').filter(has_text="概要")
             ).first
 
             if await overview_button.count() > 0:
-                await overview_button.click()
-                logger.debug("Clicked Overview tab, waiting for content...")
+                # Check if already active
+                is_active = await overview_button.evaluate("el => el.classList.contains('bIzKKx__TabButton--active') || el.className.includes('--active')")
 
-                # Wait for content to load after tab click
-                await asyncio.sleep(2)
+                if not is_active:
+                    logger.debug("Overview tab not active, clicking...")
+                    await overview_button.click()
+                    await asyncio.sleep(2)
+                else:
+                    logger.debug("Overview tab already active")
             else:
-                logger.warning("Overview tab button not found")
-                return ""
+                logger.debug("Overview tab button not found, assuming content already visible")
 
             # Extract overview content
-            overview_container = page.locator('[class*="__courseInfoDetail"]').first
+            # Use actual class pattern from DOM: dKqlQt__courseInfoDetail
+            overview_container = page.locator('[class*="courseInfoDetail"]').first
             if await overview_container.count() > 0:
+                # Wait for content to be visible
+                await overview_container.wait_for(state="visible", timeout=5000)
                 overview_text = await overview_container.inner_text()
                 logger.debug(f"Extracted overview: {len(overview_text)} characters")
                 return overview_text.strip()
@@ -88,6 +111,8 @@ class ContentExtractor:
 
         except Exception as e:
             logger.error(f"Failed to extract overview: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return ""
 
     async def extract_transcript(self, page: Page) -> str:
@@ -95,9 +120,10 @@ class ContentExtractor:
         Extract transcript text from course page
 
         Steps:
-        1. Click tab button with class containing "__TabButton" and text "Transcript" or "字幕"
-        2. Extract all text from element with class containing "__transcriptContainer"
-        3. Preserve line breaks and spacing
+        1. Wait for tab buttons to appear
+        2. Click Transcript tab
+        3. Wait for transcript content to load
+        4. Extract text
 
         Args:
             page: Playwright Page object (on course page)
@@ -110,29 +136,65 @@ class ContentExtractor:
             await page.wait_for_load_state("domcontentloaded", timeout=10000)
             logger.debug("Page loaded for transcript extraction...")
 
-            # Additional wait for dynamic content
-            await asyncio.sleep(2)
+            # Wait for tab buttons to appear
+            try:
+                await page.wait_for_selector('button[class*="TabButton"]', timeout=15000, state="visible")
+                logger.debug("Tab buttons appeared")
+            except Exception as e:
+                logger.warning(f"Tab buttons did not appear: {e}")
+                return ""
 
             # Click Transcript/字幕 tab
-            transcript_button = page.locator('button[class*="__TabButton"]').filter(
+            transcript_button = page.locator('button[class*="TabButton"]').filter(
                 has_text="Transcript"
             ).or_(
-                page.locator('button[class*="__TabButton"]').filter(has_text="字幕")
+                page.locator('button[class*="TabButton"]').filter(has_text="字幕")
             ).first
 
             if await transcript_button.count() > 0:
+                logger.debug("Clicking Transcript tab...")
                 await transcript_button.click()
-                logger.debug("Clicked Transcript tab, waiting for content...")
 
-                # Wait for transcript content to load
-                await asyncio.sleep(2)
+                # Wait for transcript content to load (with multiple possible selectors)
+                logger.debug("Waiting for transcript content to appear...")
+
+                # Try waiting for common transcript container patterns
+                transcript_loaded = False
+                for selector in ['[class*="transcriptContainer"]', '[class*="transcript"]', '[class*="Transcript"]']:
+                    try:
+                        await page.wait_for_selector(selector, timeout=10000, state="visible")
+                        logger.debug(f"Transcript content appeared (selector: {selector})")
+                        transcript_loaded = True
+                        break
+                    except:
+                        continue
+
+                if not transcript_loaded:
+                    logger.warning("Transcript content did not appear after clicking tab")
+                    # Wait a bit anyway
+                    await asyncio.sleep(3)
             else:
                 logger.warning("Transcript tab button not found")
                 return ""
 
             # Extract transcript content
-            transcript_container = page.locator('[class*="__transcriptContainer"]').first
+            # Try multiple possible container patterns
+            transcript_container = page.locator('[class*="transcriptContainer"]').first
+
+            # Fallback: try other common patterns
+            if await transcript_container.count() == 0:
+                logger.debug("Trying alternative transcript selectors...")
+                transcript_container = page.locator('[class*="transcript"]').or_(
+                    page.locator('[class*="Transcript"]')
+                ).first
+
             if await transcript_container.count() > 0:
+                # Wait for content to be visible
+                try:
+                    await transcript_container.wait_for(state="visible", timeout=5000)
+                except:
+                    pass
+
                 transcript_text = await transcript_container.inner_text()
                 logger.debug(f"Extracted transcript: {len(transcript_text)} characters")
                 return transcript_text.strip()
@@ -142,6 +204,8 @@ class ContentExtractor:
 
         except Exception as e:
             logger.error(f"Failed to extract transcript: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return ""
 
     async def extract_summary(self, page: Page) -> Optional[str]:
