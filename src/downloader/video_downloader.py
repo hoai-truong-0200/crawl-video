@@ -100,8 +100,9 @@ class VideoDownloader:
         Returns:
             Sanitized filename
         """
-        # Replace invalid characters with underscore (consistent with ContentExtractor)
-        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        # On Linux, only '/' and null bytes are truly forbidden in filenames.
+        # Replace '/' with '_' to avoid path separator conflicts.
+        filename = filename.replace('/', '_')
 
         # Replace multiple spaces with single space
         filename = re.sub(r'\s+', ' ', filename)
@@ -147,6 +148,7 @@ class VideoDownloader:
         video_title = self.sanitize_filename(video_title)
 
         # Build path: downloads/{lang}/{categories|series}/{Category}/{Course}/{LearnPoint}/{Video}.mp4
+        # Note: self.download_dir already includes language (e.g. downloads/en)
         content_type = "series" if is_series else "categories"
         video_dir = self.download_dir / content_type / category_or_series / course_name / learning_point
         video_path = video_dir / f"{video_title}.mp4"

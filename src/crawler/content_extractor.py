@@ -303,10 +303,13 @@ class ContentExtractor:
         Returns:
             Sanitized filename
         """
-        # Replace invalid characters with underscore
-        invalid_chars = '<>:"/\\|?*'
-        for char in invalid_chars:
-            filename = filename.replace(char, '_')
+        # On Linux, only '/' and null bytes are truly forbidden in filenames.
+        # Replace '/' with '_' to avoid path separator conflicts.
+        filename = filename.replace('/', '_')
+
+        # Collapse multiple spaces into one (consistent with VideoDownloader)
+        import re
+        filename = re.sub(r'\s+', ' ', filename)
 
         # Limit length (filesystem limits)
         max_length = 200
