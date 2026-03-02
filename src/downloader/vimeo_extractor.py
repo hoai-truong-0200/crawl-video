@@ -101,33 +101,7 @@ class VimeoExtractor:
                 'best_download_url': None
             }
 
-            # Process progressive URLs (sorted by quality)
-            if progressive_files:
-                sorted_videos = sorted(
-                    progressive_files,
-                    key=lambda x: x.get('height', 0),
-                    reverse=True
-                )
-
-                for video in sorted_videos:
-                    # Clean URL: replace \u0026 with &
-                    url = video.get('url', '').replace('\\u0026', '&')
-
-                    result['progressive'].append({
-                        'quality': video.get('quality', 'unknown'),
-                        'url': url,
-                        'width': video.get('width', 0),
-                        'height': video.get('height', 0),
-                    })
-
-                # Best quality = first after sorting (already cleaned)
-                result['best_download_url'] = sorted_videos[0].get('url', '').replace('\\u0026', '&')
-
-                logger.debug(f"   ✅ Found {len(sorted_videos)} progressive URLs")
-                logger.debug(f"   📹 Best quality: {sorted_videos[0].get('quality')} "
-                           f"({sorted_videos[0].get('width')}x{sorted_videos[0].get('height')})")
-
-            # Process HLS URL - prioritize akfire_interconnect_quic CDN
+            # Process HLS URL - prioritize akfire_interconnect_quic CDN (HIGHEST PRIORITY)
             if hls_data:
                 hls_cdns = hls_data.get('cdns', {})
 
@@ -150,11 +124,36 @@ class VimeoExtractor:
                         'url': hls_url
                     }
 
-                    # Use HLS as fallback if no progressive
-                    if not result['best_download_url']:
-                        result['best_download_url'] = hls_url
+                    # HLS is now HIGHEST PRIORITY
+                    result['best_download_url'] = hls_url
 
-                    logger.debug(f"   ✅ HLS URL found (CDN: {cdn_name})")
+                    logger.debug(f"   ✅ HLS URL found (CDN: {cdn_name}) - using as best URL")
+
+            # Process progressive URLs (sorted by quality) - FALLBACK if no HLS
+            if progressive_files:
+                sorted_videos = sorted(
+                    progressive_files,
+                    key=lambda x: x.get('height', 0),
+                    reverse=True
+                )
+
+                for video in sorted_videos:
+                    # Clean URL: replace \u0026 with &
+                    url = video.get('url', '').replace('\\u0026', '&')
+
+                    result['progressive'].append({
+                        'quality': video.get('quality', 'unknown'),
+                        'url': url,
+                        'width': video.get('width', 0),
+                        'height': video.get('height', 0),
+                    })
+
+                # Use progressive as fallback if no HLS
+                if not result['best_download_url'] and sorted_videos:
+                    result['best_download_url'] = sorted_videos[0].get('url', '').replace('\\u0026', '&')
+                    logger.debug(f"   ✅ Found {len(sorted_videos)} progressive URLs")
+                    logger.debug(f"   📹 Using Progressive as fallback: {sorted_videos[0].get('quality')} "
+                               f"({sorted_videos[0].get('width')}x{sorted_videos[0].get('height')})")
 
             # Process DASH URL - prioritize akfire_interconnect_quic CDN
             if dash_data:
@@ -179,7 +178,10 @@ class VimeoExtractor:
                         'url': dash_url
                     }
 
-                    logger.debug(f"   ✅ DASH URL found (CDN: {cdn_name})")
+                    # Use DASH only if no HLS and no Progressive
+                    if not result['best_download_url']:
+                        result['best_download_url'] = dash_url
+                        logger.debug(f"   ✅ DASH URL found (CDN: {cdn_name}) - using as fallback")
 
             if result['best_download_url']:
                 logger.debug(f"   ✅ Best download URL selected")

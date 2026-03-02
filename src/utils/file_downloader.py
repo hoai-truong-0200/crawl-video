@@ -2,10 +2,12 @@
 File Downloader
 
 Downloads files from URLs with progress tracking and retry logic.
+Supports both direct downloads and HLS/DASH streaming formats.
 """
 
 import aiohttp
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import Optional
 from loguru import logger
@@ -40,7 +42,102 @@ class FileDownloader:
         timeout: int = 300
     ) -> bool:
         """
-        Download file from URL
+        Download file from URL (auto-detects HLS/DASH and uses appropriate method)
+
+        Args:
+            url: Download URL
+            output_path: Output file path
+            timeout: Download timeout in seconds
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Detect if URL is HLS/DASH streaming format
+        if '.m3u8' in url or 'playlist' in url:
+            logger.debug("Detected HLS/DASH stream, using ffmpeg")
+            return await self.download_stream(url, output_path, timeout)
+        else:
+            logger.debug("Direct download (non-streaming)")
+            return await self.download_direct(url, output_path, timeout)
+
+    async def download_stream(
+        self,
+        url: str,
+        output_path: Path,
+        timeout: int = 300
+    ) -> bool:
+        """
+        Download HLS/DASH stream using ffmpeg
+
+        Args:
+            url: HLS/DASH stream URL (m3u8 playlist)
+            output_path: Output file path
+            timeout: Download timeout in seconds
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Create output directory if not exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            logger.debug(f"Downloading HLS/DASH stream with ffmpeg: {output_path.name}")
+
+            # Use ffmpeg to download and convert HLS stream to MP4
+            cmd = [
+                'ffmpeg',
+                '-i', url,
+                '-c', 'copy',  # Copy codec (no re-encoding)
+                '-bsf:a', 'aac_adtstoasc',  # Fix AAC stream
+                '-y',  # Overwrite output file
+                str(output_path)
+            ]
+
+            # Run ffmpeg
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            # Wait for completion with timeout
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout
+                )
+
+                if process.returncode == 0:
+                    file_size = output_path.stat().st_size
+                    logger.debug(f"✅ ffmpeg download complete: {output_path.name} ({file_size:,} bytes)")
+                    return True
+                else:
+                    error_msg = stderr.decode('utf-8', errors='ignore').strip()
+                    logger.error(f"ffmpeg failed (exit code {process.returncode})")
+                    logger.debug(f"ffmpeg stderr: {error_msg[-500:]}")  # Last 500 chars
+                    return False
+
+            except asyncio.TimeoutError:
+                logger.warning(f"ffmpeg timeout after {timeout}s, killing process")
+                process.kill()
+                await process.wait()
+                return False
+
+        except FileNotFoundError:
+            logger.error("❌ ffmpeg not found. Install with: sudo apt-get install ffmpeg")
+            return False
+        except Exception as e:
+            logger.error(f"Error downloading stream: {e}")
+            return False
+
+    async def download_direct(
+        self,
+        url: str,
+        output_path: Path,
+        timeout: int = 300
+    ) -> bool:
+        """
+        Download file directly from URL (non-streaming)
 
         Args:
             url: Download URL

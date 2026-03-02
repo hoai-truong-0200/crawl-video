@@ -47,7 +47,7 @@ class CategoryParser:
         """
         self.base_url = base_url.rstrip('/')
 
-    async def click_show_more_until_all_loaded(self, page: Page, max_clicks: int = 50) -> int:
+    async def click_show_more_until_all_loaded(self, page: Page, max_clicks: int = 10000) -> int:
         """
         Click 'Show More' button repeatedly until all items are loaded
 

@@ -7,6 +7,8 @@ Downloads videos using yt-dlp with browser cookies.
 import asyncio
 import re
 import subprocess
+import sys
+import shutil
 from pathlib import Path
 from typing import Optional, Dict
 from loguru import logger
@@ -43,8 +45,50 @@ class VideoDownloader:
         self.download_dir = download_dir / language
         self.cookies_from_browser = cookies_from_browser
 
+        # Find yt-dlp executable (prefer venv version)
+        self.yt_dlp_path = self._find_yt_dlp()
+        self.use_python_module = self._check_use_python_module()
+        if not self.yt_dlp_path:
+            logger.warning("⚠️  yt-dlp not found. Install with: pip install yt-dlp")
+
         # Create download directory
         self.download_dir.mkdir(parents=True, exist_ok=True)
+
+    def _check_use_python_module(self) -> bool:
+        """Check if we should use 'python -m yt_dlp' instead of direct executable"""
+        try:
+            import yt_dlp
+            return self.yt_dlp_path == sys.executable
+        except ImportError:
+            return False
+
+    def _find_yt_dlp(self) -> str:
+        """
+        Find yt-dlp executable path
+
+        Returns:
+            Path to yt-dlp executable, or Python module invocation
+        """
+        # Priority 1: Use current Python interpreter + yt_dlp module
+        # This works regardless of venv path issues
+        try:
+            import yt_dlp
+            # Use: python -m yt_dlp
+            python_path = sys.executable
+            logger.debug(f"Using yt-dlp module via Python: {python_path} -m yt_dlp")
+            return python_path
+        except ImportError:
+            pass
+
+        # Priority 2: Check if yt-dlp is in PATH
+        yt_dlp_in_path = shutil.which('yt-dlp')
+        if yt_dlp_in_path:
+            logger.debug(f"Using yt-dlp from PATH: {yt_dlp_in_path}")
+            return yt_dlp_in_path
+
+        # Fallback: return 'yt-dlp' and hope it's in PATH
+        logger.warning("⚠️  yt-dlp not found")
+        return 'yt-dlp'
 
     def sanitize_filename(self, filename: str) -> str:
         """
@@ -56,8 +100,8 @@ class VideoDownloader:
         Returns:
             Sanitized filename
         """
-        # Remove invalid characters
-        filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+        # Replace invalid characters with underscore (consistent with ContentExtractor)
+        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
 
         # Replace multiple spaces with single space
         filename = re.sub(r'\s+', ' ', filename)
@@ -166,18 +210,32 @@ class VideoDownloader:
                 temp_path = video_path.with_suffix('.mp4.part')
 
                 # Build yt-dlp command
-                cmd = [
-                    'yt-dlp',
-                    '--cookies-from-browser', self.cookies_from_browser,
-                    '--referer', referer_url,
-                    '--format', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-                    '--merge-output-format', 'mp4',
-                    '--output', str(temp_path),
-                    '--no-playlist',
-                    '--quiet',
-                    '--progress',
-                    vimeo_url,
-                ]
+                if self.use_python_module:
+                    cmd = [
+                        self.yt_dlp_path, '-m', 'yt_dlp',
+                        '--cookies-from-browser', self.cookies_from_browser,
+                        '--referer', referer_url,
+                        '--format', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                        '--merge-output-format', 'mp4',
+                        '--output', str(temp_path),
+                        '--no-playlist',
+                        '--quiet',
+                        '--progress',
+                        vimeo_url,
+                    ]
+                else:
+                    cmd = [
+                        self.yt_dlp_path,
+                        '--cookies-from-browser', self.cookies_from_browser,
+                        '--referer', referer_url,
+                        '--format', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                        '--merge-output-format', 'mp4',
+                        '--output', str(temp_path),
+                        '--no-playlist',
+                        '--quiet',
+                        '--progress',
+                        vimeo_url,
+                    ]
 
                 # Run yt-dlp
                 process = await asyncio.create_subprocess_exec(
@@ -288,7 +346,6 @@ class VideoDownloader:
                     # Download progressive MP4 directly with aiohttp
                     logger.info(f"      📥 Downloading (progressive): {video_title}")
                     logger.info(f"         Attempt {attempt}/{max_retries}")
-                    logger.info(f"         Download URL: {download_url}")
 
                     temp_path = video_path.with_suffix('.mp4.part')
 
@@ -315,8 +372,20 @@ class VideoDownloader:
                                 # Rename to final path
                                 if temp_path.exists() and temp_path.stat().st_size > 0:
                                     temp_path.rename(video_path)
+
+                                    # Validate downloaded video with ffprobe
+                                    is_valid, duration = self.validate_video_with_ffprobe(video_path)
+                                    if not is_valid:
+                                        logger.warning(f"      ⚠️  Downloaded file is not a valid video, deleting")
+                                        video_path.unlink()
+                                        if attempt < max_retries:
+                                            await asyncio.sleep(2 ** attempt)
+                                            continue
+                                        return False
+
                                     file_size = video_path.stat().st_size
-                                    logger.info(f"      ✅ Downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB)")
+                                    duration_str = f", {duration:.1f}s" if duration else ""
+                                    logger.info(f"      ✅ Downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB{duration_str})")
                                     return True
                                 else:
                                     logger.error(f"      ❌ Download failed: file not created")
@@ -335,20 +404,31 @@ class VideoDownloader:
                     # Download HLS/DASH with yt-dlp
                     logger.info(f"      📥 Downloading (HLS/DASH): {video_title}")
                     logger.info(f"         Attempt {attempt}/{max_retries}")
-                    logger.info(f"         Download URL: {download_url}")
 
                     temp_path = video_path.with_suffix('.mp4.part')
 
-                    cmd = [
-                        'yt-dlp',
-                        download_url,
-                        '-o', str(temp_path),
-                        '--no-playlist',
-                        '--newline',  # Print progress on new lines for better logging
-                        '--verbose',  # Show detailed error messages
-                    ]
+                    if self.use_python_module:
+                        cmd = [
+                            self.yt_dlp_path, '-m', 'yt_dlp',
+                            download_url,
+                            '-o', str(temp_path),
+                            '--no-playlist',
+                            '--newline',  # Print progress on new lines for better logging
+                            '--verbose',  # Show detailed error messages
+                        ]
+                        cmd_display = f"python -m yt_dlp {download_url[:80]}..."
+                    else:
+                        cmd = [
+                            self.yt_dlp_path,
+                            download_url,
+                            '-o', str(temp_path),
+                            '--no-playlist',
+                            '--newline',  # Print progress on new lines for better logging
+                            '--verbose',  # Show detailed error messages
+                        ]
+                        cmd_display = f"{Path(self.yt_dlp_path).name} {download_url[:80]}..."
 
-                    logger.info(f"         Running: yt-dlp {download_url[:80]}...")
+                    logger.info(f"         Running: {cmd_display}")
 
                     # Run with real-time output
                     process = await asyncio.create_subprocess_exec(
@@ -426,8 +506,19 @@ class VideoDownloader:
                                     video_path.unlink()
                                 downloaded_file.rename(video_path)
 
+                            # Validate downloaded video with ffprobe
+                            is_valid, duration = self.validate_video_with_ffprobe(video_path)
+                            if not is_valid:
+                                logger.warning(f"      ⚠️  Downloaded file is not a valid video, deleting")
+                                video_path.unlink()
+                                if attempt < max_retries:
+                                    await asyncio.sleep(2 ** attempt)
+                                    continue
+                                return False
+
                             file_size = video_path.stat().st_size
-                            logger.info(f"      ✅ Downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB)")
+                            duration_str = f", {duration:.1f}s" if duration else ""
+                            logger.info(f"      ✅ Downloaded: {video_path.name} ({file_size / 1024 / 1024:.1f} MB{duration_str})")
                             return True
                         else:
                             logger.error(f"      ❌ Download succeeded but file not found")
@@ -470,6 +561,69 @@ class VideoDownloader:
                     return False
 
         return False
+
+    def validate_video_with_ffprobe(self, video_path: Path) -> tuple[bool, float | None]:
+        """
+        Validate video file with ffprobe
+
+        Args:
+            video_path: Path to video file
+
+        Returns:
+            Tuple of (is_valid, duration_seconds)
+            is_valid: True if file is valid video
+            duration_seconds: Video duration in seconds, or None if not available
+        """
+        try:
+            logger.debug(f"      🔍 Verifying video with ffprobe: {video_path.name}")
+
+            result = subprocess.run(
+                [
+                    'ffprobe',
+                    '-v', 'error',
+                    '-select_streams', 'v:0',
+                    '-show_entries', 'stream=codec_type,duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1',
+                    str(video_path)
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode == 0:
+                output_lines = result.stdout.strip().split('\n')
+                # Check if first line is 'video' (codec_type)
+                if output_lines and output_lines[0] == 'video':
+                    duration = None
+                    # Try to get duration if available
+                    if len(output_lines) > 1 and output_lines[1]:
+                        try:
+                            duration = float(output_lines[1])
+                        except:
+                            pass
+                    logger.debug(f"      ✅ Video is valid")
+                    return True, duration
+                else:
+                    logger.warning(f"      ⚠️  File exists but no video stream found")
+                    return False, None
+            else:
+                logger.warning(f"      ⚠️  ffprobe failed: {result.stderr.strip()}")
+                return False, None
+
+        except FileNotFoundError:
+            logger.warning("      ⚠️  ffprobe not found, skipping validation")
+            # Assume valid if file size > 100KB
+            file_size = video_path.stat().st_size
+            return file_size > 100000, None
+        except subprocess.TimeoutExpired:
+            logger.warning("      ⚠️  ffprobe timeout, skipping validation")
+            file_size = video_path.stat().st_size
+            return file_size > 100000, None
+        except Exception as e:
+            logger.warning(f"      ⚠️  ffprobe error: {e}")
+            file_size = video_path.stat().st_size
+            return file_size > 100000, None
 
     def is_video_downloaded(
         self,
