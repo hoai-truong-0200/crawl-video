@@ -110,9 +110,10 @@ class VideoDownloader:
         # Trim whitespace
         filename = filename.strip()
 
-        # Limit length to 200 characters
-        if len(filename) > 200:
-            filename = filename[:200]
+        # Limit to 240 bytes (Linux filesystem limit is 255 bytes per component).
+        # Use bytes not characters: Japanese UTF-8 = 3 bytes/char, so 200 chars = 600 bytes.
+        while len(filename.encode('utf-8')) > 240:
+            filename = filename[:-1].rstrip()
 
         return filename
 

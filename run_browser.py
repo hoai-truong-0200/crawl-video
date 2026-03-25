@@ -1407,6 +1407,79 @@ async def init_all_languages(page, target_language=None):
 
 
 # ============================================================
+# QUIZ STEP HANDLER
+# ============================================================
+
+async def handle_quiz_step(page, output_dir: Path, step_id: str, downloader) -> bool:
+    """
+    Handle a quiz course step: extract content, save to txt file, click Skip Quiz.
+
+    Args:
+        page: Playwright Page object (on quiz page)
+        output_dir: Directory to save quiz file
+        step_id: Step ID from video URL (used in filename)
+        downloader: VideoDownloader instance (for sanitize_filename)
+
+    Returns:
+        True if handled successfully, False on error
+    """
+    try:
+        quiz_container = page.locator('[class*="hUuirL__quiz"]').first
+        if await quiz_container.count() == 0:
+            return False
+
+        # Extract title
+        title_el = quiz_container.locator('[class*="hUuirL__quizTitle"]').first
+        title = (await title_el.inner_text()).strip() if await title_el.count() > 0 else "Quiz"
+
+        # Extract question
+        question_el = quiz_container.locator('[class*="hUuirL__question"]').first
+        question = (await question_el.inner_text()).strip() if await question_el.count() > 0 else ""
+
+        # Extract answer options
+        answer_els = quiz_container.locator('[class*="hUuirL__answerContent"]')
+        answers = []
+        for i in range(await answer_els.count()):
+            answer_text = (await answer_els.nth(i).inner_text()).strip()
+            if answer_text:
+                answers.append(answer_text)
+
+        # Build filename: quiz_{title}_{step_id}.txt
+        safe_title = downloader.sanitize_filename(title)
+        quiz_filename = f"quiz_{safe_title}_{step_id}.txt"
+        quiz_file = output_dir / quiz_filename
+
+        if quiz_file.exists():
+            logger.info(f"⏭️  Quiz file already exists: {quiz_filename}")
+        else:
+            lines = [title, "", question, ""]
+            for i, answer in enumerate(answers, 1):
+                lines.append(f"{i}. {answer}")
+            quiz_file.write_text("\n".join(lines), encoding="utf-8")
+            logger.info(f"✅ Saved quiz: {quiz_file}")
+
+        # Click Skip Quiz button (EN or JA)
+        skip_button = page.locator('button').filter(has_text="Skip Quiz").or_(
+            page.locator('button').filter(has_text="このクイズをスキップする")
+        ).first
+
+        if await skip_button.count() > 0:
+            await skip_button.click()
+            logger.info("⏭️  Clicked Skip Quiz button")
+            await asyncio.sleep(1)
+        else:
+            logger.warning("⚠️  Skip Quiz button not found")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to handle quiz step: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+
+
+# ============================================================
 # STEP 4G: DOWNLOAD ALL VIDEOS
 # ============================================================
 
@@ -1518,6 +1591,14 @@ async def download_all_videos(page, content_file=None, only_empty: bool = False)
                         safe_filename = downloader.sanitize_filename(video_title)
                         output_file = output_dir / f"{safe_filename}.mp4"
 
+                        # Check if this step was already handled as a quiz
+                        step_id = video.step_id or video.url.rstrip('/').split('/')[-1]
+                        existing_quiz = list(output_dir.glob(f"quiz_*_{step_id}.txt"))
+                        if existing_quiz:
+                            logger.info(f"⏭️  Skipping (quiz already saved): {existing_quiz[0].name}")
+                            skipped_count += 1
+                            continue
+
                         # Skip only if BOTH is_downloaded=true AND file exists
                         if video.is_downloaded and output_file.exists():
                             logger.info(f"⏭️  Skipping (already downloaded and file exists): {output_file.name}")
@@ -1570,6 +1651,40 @@ async def download_all_videos(page, content_file=None, only_empty: bool = False)
                                 )
                             except:
                                 pass
+
+                            # Check if this step is a quiz instead of a video
+                            is_quiz = await page.locator('[class*="hUuirL__quiz"]').count() > 0
+                            if is_quiz:
+                                logger.info("🧩 Quiz step detected, handling quiz...")
+                                await interceptor.stop()
+                                quiz_ok = await handle_quiz_step(page, output_dir, step_id, downloader)
+                                if quiz_ok:
+                                    video.is_downloaded = True
+                                    downloaded_count += 1
+                                    content_manager.save()
+                                else:
+                                    failed_count += 1
+                                continue
+
+                            # Check if this step is a free-fill quiz (just skip, no extraction)
+                            is_freefill = await page.locator('[class*="esBuMZ__quizCommentPageTitle"]').count() > 0
+                            if is_freefill:
+                                logger.info("📝 Free-fill quiz step detected, skipping...")
+                                await interceptor.stop()
+                                skip_el = page.locator('[class*="fsLUnp--transparent"]').filter(
+                                    has_text="Skip Quiz"
+                                ).or_(
+                                    page.locator('[class*="fsLUnp--transparent"]').filter(
+                                        has_text="このクイズをスキップする"
+                                    )
+                                ).first
+                                if await skip_el.count() > 0:
+                                    await skip_el.click()
+                                    logger.info("⏭️  Clicked Skip Quiz on free-fill quiz")
+                                    await asyncio.sleep(1)
+                                else:
+                                    logger.warning("⚠️  Skip Quiz button not found for free-fill quiz")
+                                continue
 
                             # Extract download URL using VimeoExtractor
                             try:

@@ -310,13 +310,14 @@ class ContentExtractor:
         # Collapse multiple spaces into one (consistent with VideoDownloader)
         import re
         filename = re.sub(r'\s+', ' ', filename)
+        filename = filename.strip()
 
-        # Limit length (filesystem limits)
-        max_length = 200
-        if len(filename) > max_length:
-            filename = filename[:max_length]
+        # Limit to 240 bytes (Linux filesystem limit is 255 bytes per component).
+        # Use bytes not characters: Japanese UTF-8 = 3 bytes/char, so 200 chars = 600 bytes.
+        while len(filename.encode('utf-8')) > 240:
+            filename = filename[:-1].rstrip()
 
-        return filename.strip()
+        return filename
 
     async def extract_and_save(
         self,
